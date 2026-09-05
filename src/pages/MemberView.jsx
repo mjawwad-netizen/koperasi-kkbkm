@@ -37,23 +37,82 @@ export default function MemberView() {
 }
 
 function BayarModal({ userId, onClose, addPembayaran }) {
+  const { simpananPokok, simpananWajib } = useData();
+  const pokok = simpananPokok[userId];
+  const wajib = simpananWajib[userId] || [];
+  const bulanBelumBayar = BULAN.map((b, i) => i).filter(i => !wajib.includes(i) && i <= new Date().getMonth());
+
   const [jenis, setJenis] = useState("Simpanan wajib");
-  const [jumlah, setJumlah] = useState(""); const [buktiText, setBuktiText] = useState(""); const [buktiImg, setBuktiImg] = useState(null);
+  const [jumlahBulan, setJumlahBulan] = useState(1);
+  const [buktiText, setBuktiText] = useState(""); const [buktiImg, setBuktiImg] = useState(null);
   const [ket, setKet] = useState(""); const [err, setErr] = useState(""); const [done, setDone] = useState(false); const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const handleFile = async (e) => { const f = e.target.files?.[0]; if (!f) return; setUploading(true); setBuktiImg(await compressImage(f)); setUploading(false); };
+
+  // Hitung jumlah bayar
+  let jumlahBayar = 0;
+  let labelBayar = "";
+  if (jenis === "Simpanan wajib") {
+    jumlahBayar = jumlahBulan * SIMPANAN_WAJIB;
+    labelBayar = `${jumlahBulan} bulan × Rp ${fmt(SIMPANAN_WAJIB)} = Rp ${fmt(jumlahBayar)}`;
+  } else {
+    const skema = pokok?.skemaAngsur || 1;
+    const terbayar = pokok?.terbayar || 0;
+    const sisaAngsuran = skema - terbayar;
+    jumlahBayar = SIMPANAN_POKOK / skema;
+    labelBayar = skema === 1
+      ? `Lunas: Rp ${fmt(SIMPANAN_POKOK)}`
+      : `Angsuran ke-${terbayar + 1} dari ${skema}: Rp ${fmt(jumlahBayar)}`;
+  }
+
   const kirim = () => {
-    if (!jumlah || parseInt(jumlah) <= 0) { setErr("Jumlah harus diisi"); return; }
     if (!buktiText.trim() && !buktiImg) { setErr("Upload bukti atau isi no. referensi"); return; }
-    addPembayaran({ id: `PB-${Date.now()}`, anggotaId: userId, tgl: tglNow(), waktu: waktuNow(), jenis, jumlah: parseInt(jumlah), bukti: buktiText, buktiImg: buktiImg || "", status: "menunggu", keterangan: ket || jenis });
+    const keteranganFinal = jenis === "Simpanan wajib"
+      ? `${jumlahBulan} bulan (${ket || ""})`
+      : `${pokok?.skemaAngsur === 1 ? "Lunas" : `Angsuran ke-${(pokok?.terbayar||0)+1}`} (${ket || ""})`;
+    addPembayaran({ id: `PB-${Date.now()}`, anggotaId: userId, tgl: tglNow(), waktu: waktuNow(), jenis, jumlah: jumlahBayar, bukti: buktiText, buktiImg: buktiImg || "", status: "menunggu", keterangan: keteranganFinal });
     setDone(true);
   };
+
   if (done) return (<div style={S.modal} onClick={onClose}><div style={{ ...S.modalContent, textAlign: "center" }} onClick={e => e.stopPropagation()}><div style={{ fontSize: 24, color: "#16A34A", marginBottom: 8 }}>✓</div><div style={{ fontSize: 16, fontWeight: 600 }}>Pembayaran terkirim</div><div style={{ fontSize: 13, color: "#64748B", margin: "4px 0 16px" }}>Menunggu konfirmasi admin</div><button style={S.btn()} onClick={onClose}>Tutup</button></div></div>);
+
   return (<div style={S.modal} onClick={onClose}><div style={S.modalContent} onClick={e => e.stopPropagation()}>
     <div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Bukti pembayaran</span><button onClick={onClose} style={S.closeBtn}>✕</button></div>
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <select style={S.input} value={jenis} onChange={e => setJenis(e.target.value)}><option>Simpanan wajib</option><option>Simpanan pokok</option><option>Angsuran simpanan pokok</option></select>
-      <input style={S.input} placeholder="Jumlah (Rp)" type="number" value={jumlah} onChange={e => setJumlah(e.target.value)} />
+      {/* JENIS */}
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Jenis pembayaran</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button style={S.btnSm(jenis === "Simpanan wajib" ? "#2563EB" : "#CBD5E1")} onClick={() => setJenis("Simpanan wajib")}>Simpanan wajib</button>
+        {!pokok?.lunas && <button style={S.btnSm(jenis === "Simpanan pokok" ? "#2563EB" : "#CBD5E1")} onClick={() => setJenis("Simpanan pokok")}>Simpanan pokok</button>}
+      </div>
+
+      {/* SIMPANAN WAJIB: pilih berapa bulan */}
+      {jenis === "Simpanan wajib" && (<>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Bayar berapa bulan?</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {[1, 2, 3, 6, 12].map(n => (
+            <button key={n} style={{ ...S.card, marginBottom: 0, padding: "8px 14px", cursor: "pointer", border: jumlahBulan === n ? "2px solid #2563EB" : "1px solid #E8E4DC", fontWeight: jumlahBulan === n ? 600 : 400, fontSize: 13 }} onClick={() => setJumlahBulan(n)}>
+              {n} bln
+            </button>
+          ))}
+        </div>
+      </>)}
+
+      {/* SIMPANAN POKOK: info angsuran */}
+      {jenis === "Simpanan pokok" && (
+        <div style={{ ...S.card, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+          <div style={{ fontSize: 13, color: "#64748B" }}>Skema: {pokok?.skemaAngsur === 1 ? "Lunas langsung" : `Angsur ${pokok?.skemaAngsur}x`}</div>
+          <div style={{ fontSize: 13, color: "#64748B" }}>Sudah bayar: {pokok?.terbayar || 0} dari {pokok?.skemaAngsur || 1}</div>
+        </div>
+      )}
+
+      {/* TOTAL */}
+      <div style={{ ...S.card, background: "#F0FDF4", border: "1px solid #BBF7D0", textAlign: "center" }}>
+        <div style={{ fontSize: 12, color: "#166534" }}>{labelBayar}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "#16A34A", marginTop: 4 }}>Rp {fmt(jumlahBayar)}</div>
+      </div>
+
+      {/* UPLOAD BUKTI */}
       <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Upload bukti transfer</div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ fontSize: 13 }} />
       {uploading && <p style={{ fontSize: 12, color: "#64748B" }}>Mengompresi...</p>}
