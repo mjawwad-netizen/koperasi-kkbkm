@@ -69,18 +69,65 @@ export default function Kasir() {
   };
 
   // NOTA PRINT
-  const printNota = (trx) => {
-    const w = window.open("", "_blank", "width=400,height=600");
+   const printNota = (trx) => {
+    const w = window.open("", "_blank");
     if (!w) return;
-    const items = trx.items.map(it => `<tr><td style="padding:2px 0">${it.nama}</td><td style="text-align:center">${it.qty}</td><td style="text-align:right">Rp ${fmt(it.harga)}</td><td style="text-align:right">Rp ${fmt(it.subtotal)}</td></tr>`).join("");
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Nota</title><style>*{margin:0;padding:0;font-family:monospace;font-size:12px}body{padding:10px;max-width:380px;margin:0 auto}.center{text-align:center}hr{border:none;border-top:1px dashed #000;margin:6px 0}table{width:100%;border-collapse:collapse}td{padding:3px 0}.right{text-align:right}.bold{font-weight:700}@media print{.no-print{display:none}}</style></head><body>
-      <div class="center"><strong style="font-size:16px">KOPERASI BAZARA</strong><br>Kabupaten Malang<br><hr></div>
-      <div>No: ${trx.id}<br>Tanggal: ${trx.tgl} ${trx.waktu}<br>Kasir: Admin<br>Pembeli: ${trx.pembeli?.nama || "-"}${trx.pembeli?.type === "anggota" ? ` (${trx.pembeli.id})` : ""}</div><hr>
-      <table><tr class="bold"><td>Barang</td><td style="text-align:center">Qty</td><td style="text-align:right">Harga</td><td style="text-align:right">Total</td></tr>${items}</table><hr>
-      <table><tr class="bold"><td>TOTAL</td><td class="right" style="font-size:14px">Rp ${fmt(trx.total)}</td></tr><tr><td>Bayar</td><td class="right">Rp ${fmt(trx.bayar)}</td></tr><tr><td>Kembalian</td><td class="right">Rp ${fmt(trx.kembalian)}</td></tr></table><hr>
-      ${trx.pembeli?.type === "anggota" ? `<div class="center">+${Math.floor(trx.total / POIN_PER_RP)} poin untuk anggota</div><hr>` : ""}
-      <div class="center">Terima kasih<br>Dari kita untuk kita</div>
-      <div class="center no-print" style="margin-top:16px"><button onclick="window.print()" style="padding:8px 24px;font-size:14px;cursor:pointer">🖨 Cetak</button> <button onclick="window.close()" style="padding:8px 24px;font-size:14px;cursor:pointer">Tutup</button></div>
+    const items = trx.items.map(it => `
+      <tr>
+        <td>${it.nama}</td>
+        <td style="text-align:center">${it.qty}</td>
+        <td style="text-align:right">${fmt(it.harga)}</td>
+        <td style="text-align:right">${fmt(it.subtotal)}</td>
+      </tr>`).join("");
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nota</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Courier New',monospace;padding:20px;max-width:500px;margin:0 auto;font-size:16px;line-height:1.5}
+      .header{text-align:center;margin-bottom:16px}
+      .header h1{font-size:22px;margin-bottom:2px}
+      .header p{font-size:14px;color:#555}
+      hr{border:none;border-top:2px dashed #333;margin:12px 0}
+      .info{font-size:14px;margin-bottom:4px}
+      table{width:100%;border-collapse:collapse;margin:8px 0}
+      th,td{padding:6px 4px;font-size:15px}
+      th{text-align:left;border-bottom:1px solid #333}
+      .total-row td{font-size:18px;font-weight:700;padding-top:10px}
+      .summary td{font-size:15px;padding:3px 4px}
+      .footer{text-align:center;margin-top:16px;font-size:14px;color:#555}
+      .poin{text-align:center;font-size:15px;font-weight:700;color:#16A34A;margin:8px 0}
+      .btn-row{text-align:center;margin-top:20px}
+      .btn-row button{padding:12px 28px;font-size:16px;cursor:pointer;border:none;border-radius:8px;margin:0 6px;font-weight:600}
+      .btn-print{background:#2563EB;color:white}
+      .btn-close{background:#E2E8F0;color:#333}
+      @media print{.no-print{display:none !important}body{padding:8px;font-size:14px}th,td{font-size:13px;padding:4px 2px}.total-row td{font-size:16px}}
+    </style></head><body>
+      <div class="header">
+        <h1>KOPERASI BAZARA</h1>
+        <p>Kabupaten Malang</p>
+        <p>Dari kita untuk kita</p>
+      </div>
+      <hr>
+      <div class="info">No: ${trx.id}</div>
+      <div class="info">Tanggal: ${trx.tgl} · ${trx.waktu}</div>
+      <div class="info">Pembeli: ${trx.pembeli?.nama || "-"}${trx.pembeli?.type === "anggota" ? " (" + trx.pembeli.id + ")" : ""}</div>
+      <hr>
+      <table>
+        <tr><th>Barang</th><th style="text-align:center">Qty</th><th style="text-align:right">Harga</th><th style="text-align:right">Subtotal</th></tr>
+        ${items}
+      </table>
+      <hr>
+      <table>
+        <tr class="total-row"><td>TOTAL</td><td colspan="3" style="text-align:right">Rp ${fmt(trx.total)}</td></tr>
+        <tr class="summary"><td>Bayar</td><td colspan="3" style="text-align:right">Rp ${fmt(trx.bayar)}</td></tr>
+        <tr class="summary"><td>Kembalian</td><td colspan="3" style="text-align:right">Rp ${fmt(trx.kembalian)}</td></tr>
+      </table>
+      <hr>
+      ${trx.pembeli?.type === "anggota" ? '<div class="poin">+' + Math.floor(trx.total / POIN_PER_RP) + " poin untuk anggota</div><hr>" : ""}
+      <div class="footer">Terima kasih atas kunjungan Anda<br>Barang yang sudah dibeli tidak dapat dikembalikan</div>
+      <div class="btn-row no-print">
+        <button class="btn-print" onclick="window.print()">🖨 Cetak</button>
+        <button class="btn-close" onclick="window.close()">Tutup</button>
+      </div>
     </body></html>`);
     w.document.close();
   };
