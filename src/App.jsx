@@ -113,7 +113,7 @@ export default function KoperasiApp() {
   // AUTH
   const handleLogin = () => {
     setLoginError("");
-    if (loginId.toUpperCase() === "ADMIN" && loginPw === "admin123") {
+    if (loginId.toUpperCase() === "ADMIN" && loginPw === "426580") {
       setUser(adminUser); localStorage.setItem("koperasi-user", JSON.stringify(adminUser)); return;
     }
     const m = members.find(x => x.hp === loginId || x.id.toUpperCase() === loginId.toUpperCase());
