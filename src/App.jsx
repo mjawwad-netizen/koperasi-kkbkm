@@ -31,6 +31,8 @@ export default function KoperasiApp() {
   const [barang, setBarang] = useState(defaultBarang);
   const [transaksi, setTransaksi] = useState([]);
   const [arusKas, setArusKas] = useState([]);
+  const [pembayaran, setPembayaran] = useState([]);
+  const [showBayarForm, setShowBayarForm] = useState(false);
   const [tab, setTab] = useState("anggota");
   const [subTab, setSimpananTab] = useState("wajib");
   const [kasirTab, setKasirTab] = useState("kasir");
@@ -54,7 +56,7 @@ export default function KoperasiApp() {
   const [bayarNominal, setBayarNominal] = useState("");
   const [filterBulan, setFilterBulan] = useState(new Date().getMonth());
   const [showRegister, setShowRegister] = useState(false);
-  const [regData, setRegData] = useState({ nama: "", alamat: "", hp: "", angsuran: 0 });
+  const [regData, setRegData] = useState({ nama: "", alamat: "", hp: "", pin: "", pinConfirm: "", angsuran: 0 });
   const [regError, setRegError] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
   const STORAGE_KEY = "koperasi-data-v3";
@@ -79,6 +81,7 @@ export default function KoperasiApp() {
           if (d.barang?.length) setBarang(d.barang);
           if (d.transaksi?.length) setTransaksi(d.transaksi);
           if (d.arusKas?.length) setArusKas(d.arusKas);
+          if (d.pembayaran?.length) setPembayaran(d.pembayaran);
         }
       } catch (e) {
         try {
@@ -98,28 +101,28 @@ export default function KoperasiApp() {
     })();
   }, []);
 
-const save = useCallback((m, sp, sw, br, tr, ak) => {
-  // Simpan ke localStorage sebagai cache
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak })); } catch (e) {}
-  // Sync ke Google Sheets (background)
-  fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify({ action: "saveAll", data: { members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak } })
-  }).catch(e => console.error("Sync error:", e));
-}, []);
+  const save = useCallback((m, sp, sw, br, tr, ak, pb) => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak, pembayaran: pb })); } catch (e) {}
+    fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "saveAll", data: { members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak, pembayaran: pb } })
+    }).catch(e => console.error("Sync error:", e));
+  }, []);
 
   const addKas = useCallback((tipe, kategori, keterangan, jumlah, currentAk) => {
     const entry = { id: `AK-${Date.now()}-${Math.random().toString(36).substr(2,4)}`, tgl: tglNow(), waktu: waktuNow(), tipe, kategori, keterangan, jumlah };
     return [entry, ...currentAk];
   }, []);
 
-    const handleLogin = () => {
+      const handleLogin = () => {
     setLoginError("");
     if (loginId.toUpperCase() === "ADMIN" && loginPw === "admin123") {
       const u = adminUser;
       setUser(u); localStorage.setItem("koperasi-user", JSON.stringify(u)); return;
     }
+    const m = members.find(x => x.hp === loginId || x.id.toUpperCase() === loginId.toUpperCase());
+    if (m && m.pin === loginPw) {
     const m = members.find(x => x.id.toUpperCase() === loginId.toUpperCase());
     if (m && m.password === loginPw) {
       if (m.status === "non-aktif") { setLoginError("Akun tidak aktif"); return; }
@@ -136,17 +139,20 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
   const handleRegister = () => {
     setRegError(""); setRegSuccess("");
     if (!regData.nama.trim()) { setRegError("Nama wajib diisi"); return; }
-    if (!regData.hp.trim()) { setRegError("No. HP wajib diisi"); return; }
+        if (!regData.hp.trim()) { setRegError("No. HP wajib diisi"); return; }
+    if (!regData.pin || regData.pin.length < 4) { setRegError("PIN minimal 4 digit"); return; }
+    if (regData.pin !== regData.pinConfirm) { setRegError("PIN tidak cocok"); return; }
+    if (members.find(m => m.hp === regData.hp)) { setRegError("No. HP sudah terdaftar"); return; }
     const id = nextId();
-    const newM = { id, nama: regData.nama, alamat: regData.alamat, hp: regData.hp, tglMasuk: tglNow(), status: "aktif", password: regData.hp.slice(-4) || "1234", role: "anggota" };
+    const newM = { id, nama: regData.nama, alamat: regData.alamat, hp: regData.hp, pin: regData.pin, tglMasuk: tglNow(), status: "aktif", role: "anggota" };
     const updatedMembers = [...members, newM];
     // Setup simpanan pokok berdasarkan pilihan angsuran
     const opsi = OPSI_ANGSURAN[regData.angsuran];
     const updatedPokok = { ...simpananPokok, [id]: { lunas: false, tgl: null, angsuran: opsi.kali, terbayar: 0 } };
     setMembers(updatedMembers); setSimpananPokok(updatedPokok);
-    save(updatedMembers, updatedPokok, simpananWajib, barang, transaksi, arusKas);
-    setRegSuccess(`Berhasil! Nomor anggota Anda: ${id}. Password: ${newM.password} (4 digit terakhir No. HP)`);
-    setRegData({ nama: "", alamat: "", hp: "", angsuran: 0 });
+    save(updatedMembers, updatedPokok, simpananWajib, barang, transaksi, arusKas, pembayaran);
+    setRegSuccess(`Berhasil! Nomor anggota Anda: ${id}. Login dengan No. HP + PIN yang Anda buat.`);
+    setRegData({ nama: "", alamat: "", hp: "", pin: "", pinConfirm: "", angsuran: 0 });
   };
 
   const nextId = () => { const nums = members.map(m => parseInt(m.id.split("-")[1])); return `KKBKM-${String(Math.max(...nums) + 1).padStart(3, "0")}`; };
@@ -154,19 +160,19 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
 
   const addMember = (data) => {
     const newM = { ...data, id: nextId(), tglMasuk: tglNow(), status: "aktif", password: "1234", role: "anggota" };
-    const u = [...members, newM]; setMembers(u); save(u, simpananPokok, simpananWajib, barang, transaksi, arusKas); setShowForm(false);
+    const u = [...members, newM]; setMembers(u); save(u, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran); setShowForm(false);
   };
   const updateMember = (data) => {
-    const u = members.map(m => m.id === data.id ? { ...m, ...data } : m); setMembers(u); save(u, simpananPokok, simpananWajib, barang, transaksi, arusKas); setEditMember(null);
+    const u = members.map(m => m.id === data.id ? { ...m, ...data } : m); setMembers(u); save(u, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran); setEditMember(null);
   };
   const toggleStatus = (id) => {
-    const u = members.map(m => m.id === id ? { ...m, status: m.status === "aktif" ? "non-aktif" : "aktif" } : m); setMembers(u); save(u, simpananPokok, simpananWajib, barang, transaksi, arusKas);
+    const u = members.map(m => m.id === id ? { ...m, status: m.status === "aktif" ? "non-aktif" : "aktif" } : m); setMembers(u); save(u, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran);
   };
   const bayarPokok = (id) => {
     const u = { ...simpananPokok, [id]: { lunas: true, tgl: tglNow() } };
     const nama = members.find(m => m.id === id)?.nama || id;
     const ak = addKas("masuk", "Simpanan pokok", `${nama} (${id})`, SIMPANAN_POKOK, arusKas);
-    setSimpananPokok(u); setArusKas(ak); save(members, u, simpananWajib, barang, transaksi, ak);
+    setSimpananPokok(u); setArusKas(ak); save(members, u, simpananWajib, barang, transaksi, ak, pembayaran);
   };
   const toggleWajib = (id, bulanIdx) => {
     const cur = simpananWajib[id] || [];
@@ -179,21 +185,21 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
       u = { ...simpananWajib, [id]: [...cur, bulanIdx].sort((a,b) => a-b) };
       ak = addKas("masuk", "Simpanan wajib", `${nama} - ${BULAN[bulanIdx]}`, SIMPANAN_WAJIB, arusKas);
     }
-    setSimpananWajib(u); setArusKas(ak); save(members, simpananPokok, u, barang, transaksi, ak);
+    setSimpananWajib(u); setArusKas(ak); save(members, simpananPokok, u, barang, transaksi, ak, pembayaran);
   };
 
   const addBarang = (data) => {
     const newB = { ...data, id: nextBarangId() };
-    const u = [...barang, newB]; setBarang(u); save(members, simpananPokok, simpananWajib, u, transaksi, arusKas); setShowBarangForm(false);
+    const u = [...barang, newB]; setBarang(u); save(members, simpananPokok, simpananWajib, u, transaksi, arusKas, pembayaran); setShowBarangForm(false);
   };
   const updateBarang = (data) => {
-    const u = barang.map(b => b.id === data.id ? { ...b, ...data } : b); setBarang(u); save(members, simpananPokok, simpananWajib, u, transaksi, arusKas); setEditBarang(null);
+    const u = barang.map(b => b.id === data.id ? { ...b, ...data } : b); setBarang(u); save(members, simpananPokok, simpananWajib, u, transaksi, arusKas, pembayaran); setEditBarang(null);
   };
   const restokBarang = (id, qty, totalBiaya) => {
     const u = barang.map(b => b.id === id ? { ...b, stok: b.stok + qty } : b);
     const item = barang.find(b => b.id === id);
     const ak = addKas("keluar", "Pembelian stok", `Restok: ${item?.nama} (${qty} pcs)`, totalBiaya, arusKas);
-    setBarang(u); setArusKas(ak); save(members, simpananPokok, simpananWajib, u, transaksi, ak); setShowRestok(null);
+    setBarang(u); setArusKas(ak); save(members, simpananPokok, simpananWajib, u, transaksi, ak, pembayaran); setShowRestok(null);
   };
 
   const addToCart = (item) => {
@@ -218,13 +224,13 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
     const updatedTrx = [trx, ...transaksi];
     const ak = addKas("masuk", "Penjualan", `${cart.length} jenis barang`, cartTotal, arusKas);
     setBarang(updatedBarang); setTransaksi(updatedTrx); setArusKas(ak); setCart([]); setBayarNominal("");
-    save(members, simpananPokok, simpananWajib, updatedBarang, updatedTrx, ak);
+    save(members, simpananPokok, simpananWajib, updatedBarang, updatedTrx, ak, pembayaran);
     setShowStruk(trx);
   };
 
   const addPengeluaran = (data) => {
     const ak = addKas("keluar", data.kategori, data.keterangan, parseInt(data.jumlah), arusKas);
-    setArusKas(ak); save(members, simpananPokok, simpananWajib, barang, transaksi, ak); setShowPengeluaran(false);
+    setArusKas(ak); save(members, simpananPokok, simpananWajib, barang, transaksi, ak, pembayaran); setShowPengeluaran(false);
   };
 
   const currentMonth = new Date().getMonth();
@@ -300,9 +306,10 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
           <div style={{ width: "100%", maxWidth: 360, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10 }}>
             <input style={S.input} placeholder="Nama lengkap" value={regData.nama} onChange={e => setRegData({...regData, nama: e.target.value})} />
             <input style={S.input} placeholder="Alamat" value={regData.alamat} onChange={e => setRegData({...regData, alamat: e.target.value})} />
-            <input style={S.input} placeholder="No. HP (jadi password juga)" value={regData.hp} onChange={e => setRegData({...regData, hp: e.target.value})} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B", marginTop: 4 }}>Pembayaran simpanan pokok (Rp {fmt(SIMPANAN_POKOK)})</div>
-            {OPSI_ANGSURAN.map((o, i) => (
+            <input style={S.input} placeholder="No. HP" value={regData.hp} onChange={e => setRegData({...regData, hp: e.target.value})} />
+            <input style={S.input} placeholder="Buat PIN (minimal 4 digit)" type="password" inputMode="numeric" value={regData.pin} onChange={e => setRegData({...regData, pin: e.target.value.replace(/\D/g,"")})} maxLength={6} />
+            <input style={S.input} placeholder="Ulangi PIN" type="password" inputMode="numeric" value={regData.pinConfirm} onChange={e => setRegData({...regData, pinConfirm: e.target.value.replace(/\D/g,"")})} maxLength={6} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B", marginTop: 4 }}>Pembayaran simpanan pokok
               <label key={i} style={{ ...S.card, display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 0, border: regData.angsuran === i ? "2px solid #2563EB" : "1px solid #E8E4DC" }}>
                 <input type="radio" name="angsuran" checked={regData.angsuran === i} onChange={() => setRegData({...regData, angsuran: i})} />
                 <div><div style={{ fontSize: 14, fontWeight: 500 }}>{o.label}</div><div style={{ fontSize: 12, color: "#64748B" }}>Rp {fmt(o.perBulan)}{o.kali > 1 ? ` × ${o.kali} bulan` : ""}</div></div>
@@ -322,8 +329,8 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
           <img src="/Logo_Koperasi.png" alt="BAZARA" style={{ width: 200, marginBottom: 8 }} />
         </div>
         <div style={{ width: "100%", maxWidth: 320 }}>
-          <input style={{ ...S.input, marginBottom: 10 }} placeholder="Nomor anggota / ID" value={loginId} onChange={e => setLoginId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
-          <input style={{ ...S.input, marginBottom: 8 }} type="password" placeholder="Password" value={loginPw} onChange={e => setLoginPw(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+          <input style={{ ...S.input, marginBottom: 10 }} placeholder="No. HP atau Nomor Anggota" value={loginId}
+          <input style={{ ...S.input, marginBottom: 8 }} type="password" placeholder="PIN" inputMode="numeric" value={loginPw}
           {loginError && <p style={{ color: "#DC2626", fontSize: 12, margin: "0 0 8px" }}>{loginError}</p>}
           <button style={{ ...S.btn(), marginBottom: 10 }} onClick={handleLogin}>Masuk</button>
           <button style={{ ...S.btn("transparent"), color: "#2563EB", border: "1.5px solid #2563EB" }} onClick={() => setShowRegister(true)}>Daftar jadi anggota</button>
@@ -349,10 +356,22 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
           <div style={S.card}><div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Simpanan wajib {TAHUN_AKTIF}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{BULAN.map((b, i) => (<div key={i} style={S.monthDot(wajib.includes(i) ? "paid" : i > currentMonth ? "future" : "unpaid")}>{b.charAt(0)}</div>))}</div><div style={{ display: "flex", gap: 12, marginTop: 10, fontSize: 11, color: "#64748B" }}><span>🟢 Lunas</span><span>🔴 Belum</span><span>⚪ Belum jatuh tempo</span></div></div>
           <div style={S.card}><div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Data pribadi</div>{[["Nama", me?.nama], ["Alamat", me?.alamat], ["No. HP", me?.hp], ["Tgl masuk", me?.tglMasuk], ["Status", me?.status]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9", fontSize: 13 }}><span style={{ color: "#64748B" }}>{l}</span><span style={{ fontWeight: 500 }}>{v}</span></div>))}</div>
           <div style={{ ...S.card, textAlign: "center" }}><div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Total simpanan Anda</div><div style={{ fontSize: 24, fontWeight: 700, color: "#2563EB" }}>Rp {fmt((pokok?.lunas ? SIMPANAN_POKOK : 0) + totalWajib)}</div></div>
-        </div>
-      </div>
-    );
-  }
+          <button style={{ ...S.btn(), marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => setShowBayarForm(true)}>
+            Kirim bukti pembayaran
+          </button>
+
+          {/* Riwayat pembayaran anggota */}
+          {pembayaran.filter(p => p.anggotaId === user.id).length > 0 && (<>
+            <div style={S.sectionTitle}>Riwayat pembayaran Anda</div>
+            {pembayaran.filter(p => p.anggotaId === user.id).slice(0, 10).map(p => (
+              <div key={p.id} style={{ ...S.card, borderLeft: `3px solid ${p.status === "diterima" ? "#16A34A" : p.status === "ditolak" ? "#DC2626" : "#F59E0B"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div><div style={{ fontSize: 13, fontWeight: 600 }}>{p.jenis}</div><div style={{ fontSize: 11, color: "#64748B" }}>{p.tgl} · {p.keterangan}</div></div>
+                  <div style={{ textAlign: "right" }}><div style={{ fontSize: 14, fontWeight: 700, color: "#2563EB" }}>Rp {fmt(p.jumlah)}</div><span style={S.badge(p.status === "diterima" ? "aktif" : p.status === "ditolak" ? "non-aktif" : "low")}>{p.status}</span></div>
+                </div>
+              </div>
+            ))}
+          </>)}
 
   // ADMIN VIEW
   const filteredMembers = members.filter(m => m.nama.toLowerCase().includes(search.toLowerCase()) || m.id.toLowerCase().includes(search.toLowerCase()));
@@ -498,10 +517,35 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
               const belum = stats.activeM.filter(m => !(simpananWajib[m.id] || []).includes(currentMonth));
               return belum.length > 0 ? (<>
                 <div style={S.sectionTitle}>Simpanan wajib belum bayar — {BULAN[currentMonth]}</div>
-                {belum.map(m => (<div key={m.id} style={{ ...S.card, display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 13, fontWeight: 500 }}>{m.nama}</div><div style={{ fontSize: 11, color: "#64748B" }}>{m.id}</div></div><span style={S.badge("non-aktif")}>Belum</span></div>))}
+                            {/* PEMBAYARAN MENUNGGU VERIFIKASI */}
+            {(() => {
+              const pending = pembayaran.filter(p => p.status === "menunggu");
+              return pending.length > 0 ? (<>
+                <div style={S.sectionTitle}>🔔 Pembayaran menunggu verifikasi ({pending.length})</div>
+                {pending.map(p => {
+                  const anggota = members.find(m => m.id === p.anggotaId);
+                  return (
+                    <div key={p.id} style={{ ...S.card, borderLeft: "3px solid #F59E0B" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{anggota?.nama || p.anggotaId}</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>{p.jenis} · Rp {fmt(p.jumlah)}</div>
+                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{p.tgl} · Bukti: {p.bukti}</div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                        <button style={S.btnSm("#16A34A")} onClick={() => {
+                          const updated = pembayaran.map(x => x.id === p.id ? { ...x, status: "diterima" } : x);
+                          setPembayaran(updated);
+                          save(members, simpananPokok, simpananWajib, barang, transaksi, arusKas, updated);
+                        }}>✓ Terima</button>
+                        <button style={S.btnSm("#DC2626")} onClick={() => {
+                          const updated = pembayaran.map(x => x.id === p.id ? { ...x, status: "ditolak" } : x);
+                          setPembayaran(updated);
+                          save(members, simpananPokok, simpananWajib, barang, transaksi, arusKas, updated);
+                        }}>✕ Tolak</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </>) : null;
             })()}
-          </>)}
 
           {laporanTab === "aruskas" && (<>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -564,6 +608,56 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
       {showStruk && (<div style={S.modal} onClick={() => setShowStruk(null)}><div style={{ ...S.modalContent, textAlign: "center" }} onClick={e => e.stopPropagation()}><div style={{ fontSize: 24, color: "#16A34A", marginBottom: 8 }}>✓</div><div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Transaksi berhasil</div><div style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>{showStruk.tgl} · {showStruk.waktu}</div><div style={{ textAlign: "left", borderTop: "1px dashed #CBD5E1", paddingTop: 12 }}>{showStruk.items.map((item, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}><span>{item.nama} ×{item.qty}</span><span style={{ fontWeight: 500 }}>Rp {fmt(item.subtotal)}</span></div>))}<div style={{ borderTop: "1px dashed #CBD5E1", marginTop: 8, paddingTop: 8 }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 700 }}><span>Total</span><span>Rp {fmt(showStruk.total)}</span></div><div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748B", marginTop: 4 }}><span>Bayar</span><span>Rp {fmt(showStruk.bayar)}</span></div><div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#16A34A", fontWeight: 500 }}><span>Kembalian</span><span>Rp {fmt(showStruk.kembalian)}</span></div></div></div><button style={{ ...S.btn(), marginTop: 16 }} onClick={() => setShowStruk(null)}>Tutup</button></div></div>)}
 
       {showHistori && (<div style={S.modal} onClick={() => setShowHistori(false)}><div style={S.modalContent} onClick={e => e.stopPropagation()}><div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Riwayat transaksi</span><button onClick={() => setShowHistori(false)} style={S.closeBtn}>✕</button></div>{transaksi.length === 0 ? (<div style={{ textAlign: "center", padding: 30, color: "#94A3B8", fontSize: 13 }}>Belum ada transaksi</div>) : transaksi.slice(0, 20).map(t => (<div key={t.id} style={{ ...S.card, cursor: "pointer" }} onClick={() => { setShowHistori(false); setShowStruk(t); }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 13, fontWeight: 600 }}>{t.tgl} · {t.waktu}</div><div style={{ fontSize: 11, color: "#64748B" }}>{t.items.length} jenis barang</div></div><div style={{ fontSize: 15, fontWeight: 700, color: "#2563EB" }}>Rp {fmt(t.total)}</div></div></div>))}</div></div>)}
+    {/* FORM BAYAR - ANGGOTA → TARUH DI SINI */}
+      {showBayarForm && (() => {
+        const BayarForm = () => {
+          const [jenis, setJenis] = useState("Simpanan wajib");
+          const [jumlah, setJumlah] = useState("");
+          const [bukti, setBukti] = useState("");
+          const [ket, setKet] = useState("");
+          const [err, setErr] = useState("");
+          const [done, setDone] = useState(false);
+          const kirim = () => {
+            if (!jumlah || parseInt(jumlah) <= 0) { setErr("Jumlah harus diisi"); return; }
+            if (!bukti.trim()) { setErr("Bukti transfer wajib diisi (no. referensi / keterangan)"); return; }
+            const newP = { id: `PB-${Date.now()}`, anggotaId: user.id, tgl: tglNow(), waktu: waktuNow(), jenis, jumlah: parseInt(jumlah), bukti, status: "menunggu", keterangan: ket || jenis };
+            const updated = [newP, ...pembayaran];
+            setPembayaran(updated);
+            save(members, simpananPokok, simpananWajib, barang, transaksi, arusKas, updated);
+            setDone(true);
+          };
+          if (done) return (
+            <div style={S.modal} onClick={() => { setShowBayarForm(false); }}><div style={{ ...S.modalContent, textAlign: "center" }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: 24, color: "#16A34A", marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Pembayaran terkirim</div>
+              <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>Menunggu konfirmasi admin</div>
+              <button style={S.btn()} onClick={() => setShowBayarForm(false)}>Tutup</button>
+            </div></div>
+          );
+          return (
+            <div style={S.modal} onClick={() => setShowBayarForm(false)}><div style={S.modalContent} onClick={e => e.stopPropagation()}>
+              <div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Kirim bukti pembayaran</span><button onClick={() => setShowBayarForm(false)} style={S.closeBtn}>✕</button></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <select style={S.input} value={jenis} onChange={e => setJenis(e.target.value)}>
+                  <option>Simpanan wajib</option>
+                  <option>Simpanan pokok</option>
+                  <option>Angsuran simpanan pokok</option>
+                </select>
+                <input style={S.input} placeholder="Jumlah (Rp)" type="number" value={jumlah} onChange={e => setJumlah(e.target.value)} />
+                <input style={S.input} placeholder="No. referensi / bukti transfer" value={bukti} onChange={e => setBukti(e.target.value)} />
+                <input style={S.input} placeholder="Keterangan (opsional)" value={ket} onChange={e => setKet(e.target.value)} />
+                <div style={{ fontSize: 12, color: "#64748B", background: "#F1F5F9", padding: 10, borderRadius: 8 }}>
+                  Transfer ke:<br/><strong>Bank: [BCA]</strong><br/><strong>No. Rek: [3160054581]</strong><br/><strong>A/N: Koperasi BAZARA</strong>
+                </div>
+                {err && <p style={{ color: "#DC2626", fontSize: 12, margin: 0 }}>{err}</p>}
+                <button style={S.btn()} onClick={kirim}>Kirim</button>
+              </div>
+            </div></div>
+          );
+        };
+        return <BayarForm />;
+      })()}
+
     </div>
   );
 }
