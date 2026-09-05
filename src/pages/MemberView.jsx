@@ -119,7 +119,7 @@ function BayarModal({ userId, onClose, addPembayaran }) {
       {buktiImg && <img src={buktiImg} alt="Bukti" style={{ width: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 8, border: "1px solid #E8E4DC" }} />}
       <input style={S.input} placeholder="No. referensi (opsional)" value={buktiText} onChange={e => setBuktiText(e.target.value)} />
       <input style={S.input} placeholder="Keterangan (opsional)" value={ket} onChange={e => setKet(e.target.value)} />
-      <div style={{ fontSize: 12, color: "#64748B", background: "#F1F5F9", padding: 10, borderRadius: 8 }}>Transfer ke:<br/><strong>Bank: [ISI NAMA BANK]</strong><br/><strong>No. Rek: [ISI NO REKENING]</strong><br/><strong>A/N: Koperasi BAZARA</strong></div>
+      <div style={{ fontSize: 12, color: "#64748B", background: "#F1F5F9", padding: 10, borderRadius: 8 }}>Transfer ke:<br/><strong>Bank: BCA</strong><br/><strong>No. Rek: 12345678</strong><br/><strong>A/N: Koperasi BAZARA</strong></div>
       {err && <p style={{ color: "#DC2626", fontSize: 12, margin: 0 }}>{err}</p>}
       <button style={S.btn()} onClick={kirim}>Kirim</button>
     </div>
