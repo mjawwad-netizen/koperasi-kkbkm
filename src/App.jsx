@@ -309,7 +309,8 @@ export default function KoperasiApp() {
             <input style={S.input} placeholder="No. HP" value={regData.hp} onChange={e => setRegData({...regData, hp: e.target.value})} />
             <input style={S.input} placeholder="Buat PIN (minimal 4 digit)" type="password" inputMode="numeric" value={regData.pin} onChange={e => setRegData({...regData, pin: e.target.value.replace(/\D/g,"")})} maxLength={6} />
             <input style={S.input} placeholder="Ulangi PIN" type="password" inputMode="numeric" value={regData.pinConfirm} onChange={e => setRegData({...regData, pinConfirm: e.target.value.replace(/\D/g,"")})} maxLength={6} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B", marginTop: 4 }}>Pembayaran simpanan pokok
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B", marginTop: 4 }}>Pembayaran simpanan pokok (Rp {fmt(SIMPANAN_POKOK)})</div>
+            {OPSI_ANGSURAN.map((o, i) => (
               <label key={i} style={{ ...S.card, display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 0, border: regData.angsuran === i ? "2px solid #2563EB" : "1px solid #E8E4DC" }}>
                 <input type="radio" name="angsuran" checked={regData.angsuran === i} onChange={() => setRegData({...regData, angsuran: i})} />
                 <div><div style={{ fontSize: 14, fontWeight: 500 }}>{o.label}</div><div style={{ fontSize: 12, color: "#64748B" }}>Rp {fmt(o.perBulan)}{o.kali > 1 ? ` × ${o.kali} bulan` : ""}</div></div>
