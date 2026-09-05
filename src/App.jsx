@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 
+const API_URL = "https://script.google.com/macros/s/AKfycbzfPOY00dvqUkcG-5ef9eYWGbUT9LivtCp3nmTwdVVypMsAQxsWuUvTjv6J5jsVkDYF/exec";
 const SIMPANAN_POKOK = 1000000;
 const SIMPANAN_WAJIB = 10000;
 const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agt","Sep","Okt","Nov","Des"];
@@ -82,25 +83,50 @@ export default function KoperasiApp() {
 
   const STORAGE_KEY = "koperasi-data-v3";
 
-  useEffect(() => {
+useEffect(() => {
+  (async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d.members) setMembers(d.members);
+      const res = await fetch(API_URL);
+      const json = await res.json();
+      if (json.ok && json.data) {
+        const d = json.data;
+        if (d.members?.length) setMembers(d.members);
         if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
         if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
-        if (d.barang) setBarang(d.barang);
-        if (d.transaksi) setTransaksi(d.transaksi);
-        if (d.arusKas) setArusKas(d.arusKas);
+        if (d.barang?.length) setBarang(d.barang);
+        if (d.transaksi?.length) setTransaksi(d.transaksi);
+        if (d.arusKas?.length) setArusKas(d.arusKas);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("Gagal load data:", e);
+      // Fallback ke localStorage
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (d.members) setMembers(d.members);
+          if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
+          if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
+          if (d.barang) setBarang(d.barang);
+          if (d.transaksi) setTransaksi(d.transaksi);
+          if (d.arusKas) setArusKas(d.arusKas);
+        }
+      } catch (e2) {}
+    }
     setLoaded(true);
-  }, []);
+  })();
+}, []);
 
-  const save = useCallback((m, sp, sw, br, tr, ak) => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak })); } catch (e) {}
-  }, []);
+const save = useCallback((m, sp, sw, br, tr, ak) => {
+  // Simpan ke localStorage sebagai cache
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak })); } catch (e) {}
+  // Sync ke Google Sheets (background)
+  fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "saveAll", data: { members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak } })
+  }).catch(e => console.error("Sync error:", e));
+}, []);
 
   const addKas = useCallback((tipe, kategori, keterangan, jumlah, currentAk) => {
     const entry = { id: `AK-${Date.now()}-${Math.random().toString(36).substr(2,4)}`, tgl: tglNow(), waktu: waktuNow(), tipe, kategori, keterangan, jumlah };
