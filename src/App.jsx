@@ -329,8 +329,8 @@ export default function KoperasiApp() {
           <img src="/Logo_Koperasi.png" alt="BAZARA" style={{ width: 200, marginBottom: 8 }} />
         </div>
         <div style={{ width: "100%", maxWidth: 320 }}>
-          <input style={{ ...S.input, marginBottom: 10 }} placeholder="No. HP atau Nomor Anggota" value={loginId}
-          <input style={{ ...S.input, marginBottom: 8 }} type="password" placeholder="PIN" inputMode="numeric" value={loginPw}
+          <input style={{ ...S.input, marginBottom: 10 }} placeholder="No. HP atau Nomor Anggota" value={loginId} onChange={e => setLoginId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+          <input style={{ ...S.input, marginBottom: 8 }} type="password" placeholder="PIN" inputMode="numeric" value={loginPw} onChange={e => setLoginPw(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
           {loginError && <p style={{ color: "#DC2626", fontSize: 12, margin: "0 0 8px" }}>{loginError}</p>}
           <button style={{ ...S.btn(), marginBottom: 10 }} onClick={handleLogin}>Masuk</button>
           <button style={{ ...S.btn("transparent"), color: "#2563EB", border: "1.5px solid #2563EB" }} onClick={() => setShowRegister(true)}>Daftar jadi anggota</button>
