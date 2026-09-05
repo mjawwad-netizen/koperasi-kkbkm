@@ -7,43 +7,16 @@ const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agt","Sep","Okt","Nov"
 const TAHUN_AKTIF = 2026;
 const STOK_WARNING = 5;
 const KATEGORI_PENGELUARAN = ["Sewa tempat","Listrik & air","Transportasi","Perlengkapan","Gaji","Pembelian stok","Lain-lain"];
-
-const defaultMembers = [
-  { id: "KKBKM-001", nama: "Siti Rahmawati", alamat: "Jl. Mawar No. 12", hp: "081234567890", tglMasuk: "2025-01-15", status: "aktif", password: "1234", role: "anggota" },
-  { id: "KKBKM-002", nama: "Budi Wicaksono", alamat: "Jl. Melati No. 5", hp: "081345678901", tglMasuk: "2025-02-20", status: "aktif", password: "1234", role: "anggota" },
-  { id: "KKBKM-003", nama: "Dewi Hartini", alamat: "Jl. Kenanga No. 8", hp: "081456789012", tglMasuk: "2025-03-10", status: "aktif", password: "1234", role: "anggota" },
-  { id: "KKBKM-004", nama: "Agus Prasetyo", alamat: "Jl. Anggrek No. 3", hp: "081567890123", tglMasuk: "2025-04-05", status: "non-aktif", password: "1234", role: "anggota" },
-  { id: "KKBKM-005", nama: "Rina Kusuma", alamat: "Jl. Dahlia No. 17", hp: "081678901234", tglMasuk: "2025-05-12", status: "aktif", password: "1234", role: "anggota" },
+const OPSI_ANGSURAN = [
+  { label: "Lunas langsung", kali: 1, perBulan: SIMPANAN_POKOK },
+  { label: "Angsur 2x", kali: 2, perBulan: SIMPANAN_POKOK / 2 },
+  { label: "Angsur 4x", kali: 4, perBulan: SIMPANAN_POKOK / 4 },
 ];
 
-const defaultSimpananPokok = {
-  "KKBKM-001": { lunas: true, tgl: "2025-01-15" },
-  "KKBKM-002": { lunas: true, tgl: "2025-02-20" },
-  "KKBKM-003": { lunas: false, tgl: null },
-  "KKBKM-005": { lunas: true, tgl: "2025-05-12" },
-};
-
-const defaultSimpananWajib = {
-  "KKBKM-001": [0,1,2,3,4,5,6,7,8],
-  "KKBKM-002": [0,1,2,3,4,7,8],
-  "KKBKM-003": [0,1,2,3,4,5],
-  "KKBKM-005": [0,1,2,3,4,5,6,7,8],
-};
-
-const defaultBarang = [
-  { id: "B001", kode: "BRS-5K", nama: "Beras 5kg", kategori: "Sembako", hargaBeli: 58000, hargaJual: 65000, stok: 25 },
-  { id: "B002", kode: "MYK-1L", nama: "Minyak Goreng 1L", kategori: "Sembako", hargaBeli: 15000, hargaJual: 18000, stok: 30 },
-  { id: "B003", kode: "GLP-1K", nama: "Gula Pasir 1kg", kategori: "Sembako", hargaBeli: 12000, hargaJual: 14500, stok: 20 },
-  { id: "B004", kode: "TEP-1K", nama: "Tepung Terigu 1kg", kategori: "Sembako", hargaBeli: 10000, hargaJual: 12500, stok: 15 },
-  { id: "B005", kode: "KCP-SKS", nama: "Kecap Manis 600ml", kategori: "Bumbu", hargaBeli: 14000, hargaJual: 17000, stok: 18 },
-  { id: "B006", kode: "MIE-INS", nama: "Mie Instan (dus)", kategori: "Makanan", hargaBeli: 95000, hargaJual: 110000, stok: 12 },
-  { id: "B007", kode: "SBN-BTG", nama: "Sabun Batang", kategori: "Kebersihan", hargaBeli: 3000, hargaJual: 4500, stok: 40 },
-  { id: "B008", kode: "DTR-1L", nama: "Deterjen Cair 1L", kategori: "Kebersihan", hargaBeli: 18000, hargaJual: 22000, stok: 3 },
-  { id: "B009", kode: "GRM-1K", nama: "Garam Halus 1kg", kategori: "Sembako", hargaBeli: 5000, hargaJual: 7000, stok: 22 },
-  { id: "B010", kode: "KPI-SCH", nama: "Kopi Sachet (renceng)", kategori: "Minuman", hargaBeli: 10000, hargaJual: 13000, stok: 35 },
-  { id: "B011", kode: "AQA-GLS", nama: "Air Mineral Gelas (dus)", kategori: "Minuman", hargaBeli: 18000, hargaJual: 22000, stok: 8 },
-  { id: "B012", kode: "TLR-1K", nama: "Telur 1kg", kategori: "Sembako", hargaBeli: 26000, hargaJual: 29000, stok: 10 },
-];
+const defaultMembers = [];
+const defaultSimpananPokok = {};
+const defaultSimpananWajib = {};
+const defaultBarang = [];
 
 const adminUser = { id: "ADMIN", nama: "Administrator", role: "admin", password: "admin123" };
 const fmt = (n) => new Intl.NumberFormat("id-ID").format(n);
@@ -80,42 +53,50 @@ export default function KoperasiApp() {
   const [loaded, setLoaded] = useState(false);
   const [bayarNominal, setBayarNominal] = useState("");
   const [filterBulan, setFilterBulan] = useState(new Date().getMonth());
-
+  const [showRegister, setShowRegister] = useState(false);
+  const [regData, setRegData] = useState({ nama: "", alamat: "", hp: "", angsuran: 0 });
+  const [regError, setRegError] = useState("");
+  const [regSuccess, setRegSuccess] = useState("");
   const STORAGE_KEY = "koperasi-data-v3";
 
-useEffect(() => {
-  (async () => {
+  useEffect(() => {
+    // Persistent login
     try {
-      const res = await fetch(API_URL);
-      const json = await res.json();
-      if (json.ok && json.data) {
-        const d = json.data;
-        if (d.members?.length) setMembers(d.members);
-        if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
-        if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
-        if (d.barang?.length) setBarang(d.barang);
-        if (d.transaksi?.length) setTransaksi(d.transaksi);
-        if (d.arusKas?.length) setArusKas(d.arusKas);
-      }
-    } catch (e) {
-      console.error("Gagal load data:", e);
-      // Fallback ke localStorage
+      const savedUser = localStorage.getItem("koperasi-user");
+      if (savedUser) setUser(JSON.parse(savedUser));
+    } catch (e) {}
+
+    // Load data
+    (async () => {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const d = JSON.parse(raw);
-          if (d.members) setMembers(d.members);
+        const res = await fetch(API_URL);
+        const json = await res.json();
+        if (json.ok && json.data) {
+          const d = json.data;
+          if (d.members?.length) setMembers(d.members);
           if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
           if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
-          if (d.barang) setBarang(d.barang);
-          if (d.transaksi) setTransaksi(d.transaksi);
-          if (d.arusKas) setArusKas(d.arusKas);
+          if (d.barang?.length) setBarang(d.barang);
+          if (d.transaksi?.length) setTransaksi(d.transaksi);
+          if (d.arusKas?.length) setArusKas(d.arusKas);
         }
-      } catch (e2) {}
-    }
-    setLoaded(true);
-  })();
-}, []);
+      } catch (e) {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const d = JSON.parse(raw);
+            if (d.members) setMembers(d.members);
+            if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
+            if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
+            if (d.barang) setBarang(d.barang);
+            if (d.transaksi) setTransaksi(d.transaksi);
+            if (d.arusKas) setArusKas(d.arusKas);
+          }
+        } catch (e2) {}
+      }
+      setLoaded(true);
+    })();
+  }, []);
 
 const save = useCallback((m, sp, sw, br, tr, ak) => {
   // Simpan ke localStorage sebagai cache
@@ -133,14 +114,39 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
     return [entry, ...currentAk];
   }, []);
 
-  const handleLogin = () => {
+    const handleLogin = () => {
     setLoginError("");
-    if (loginId.toUpperCase() === "ADMIN" && loginPw === "admin123") { setUser(adminUser); return; }
+    if (loginId.toUpperCase() === "ADMIN" && loginPw === "admin123") {
+      const u = adminUser;
+      setUser(u); localStorage.setItem("koperasi-user", JSON.stringify(u)); return;
+    }
     const m = members.find(x => x.id.toUpperCase() === loginId.toUpperCase());
     if (m && m.password === loginPw) {
       if (m.status === "non-aktif") { setLoginError("Akun tidak aktif"); return; }
-      setUser({ ...m, role: "anggota" });
+      const u = { ...m };
+      setUser(u); localStorage.setItem("koperasi-user", JSON.stringify(u));
     } else { setLoginError("Nomor anggota atau password salah"); }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem("koperasi-user");
+  };
+
+  const handleRegister = () => {
+    setRegError(""); setRegSuccess("");
+    if (!regData.nama.trim()) { setRegError("Nama wajib diisi"); return; }
+    if (!regData.hp.trim()) { setRegError("No. HP wajib diisi"); return; }
+    const id = nextId();
+    const newM = { id, nama: regData.nama, alamat: regData.alamat, hp: regData.hp, tglMasuk: tglNow(), status: "aktif", password: regData.hp.slice(-4) || "1234", role: "anggota" };
+    const updatedMembers = [...members, newM];
+    // Setup simpanan pokok berdasarkan pilihan angsuran
+    const opsi = OPSI_ANGSURAN[regData.angsuran];
+    const updatedPokok = { ...simpananPokok, [id]: { lunas: false, tgl: null, angsuran: opsi.kali, terbayar: 0 } };
+    setMembers(updatedMembers); setSimpananPokok(updatedPokok);
+    save(updatedMembers, updatedPokok, simpananWajib, barang, transaksi, arusKas);
+    setRegSuccess(`Berhasil! Nomor anggota Anda: ${id}. Password: ${newM.password} (4 digit terakhir No. HP)`);
+    setRegData({ nama: "", alamat: "", hp: "", angsuran: 0 });
   };
 
   const nextId = () => { const nums = members.map(m => parseInt(m.id.split("-")[1])); return `KKBKM-${String(Math.max(...nums) + 1).padStart(3, "0")}`; };
@@ -223,6 +229,11 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
 
   const currentMonth = new Date().getMonth();
   const isAdmin = user?.role === "admin";
+  const isPengelola = user?.role === "pengelola";
+  const isAnggota = user?.role === "anggota";
+    useEffect(() => {
+    if (isPengelola) setTab("kasir");
+  }, [user]);
 
   // COMPUTED STATS
   const stats = useMemo(() => {
@@ -277,21 +288,45 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
 
   if (!loaded) return <div style={{ ...S.app, alignItems: "center", justifyContent: "center" }}><p style={{ color: "#64748B" }}>Memuat data...</p></div>;
 
-  // LOGIN
+    // LOGIN & REGISTER
   if (!user) {
+    if (showRegister) {
+      return (
+        <div style={{ ...S.app, padding: 24 }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <img src="/Logo_Koperasi.png" alt="BAZARA" style={{ width: 180, marginBottom: 8 }} />
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, textAlign: "center", marginBottom: 16, color: "#2563EB" }}>Pendaftaran Anggota</div>
+          <div style={{ width: "100%", maxWidth: 360, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10 }}>
+            <input style={S.input} placeholder="Nama lengkap" value={regData.nama} onChange={e => setRegData({...regData, nama: e.target.value})} />
+            <input style={S.input} placeholder="Alamat" value={regData.alamat} onChange={e => setRegData({...regData, alamat: e.target.value})} />
+            <input style={S.input} placeholder="No. HP (jadi password juga)" value={regData.hp} onChange={e => setRegData({...regData, hp: e.target.value})} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B", marginTop: 4 }}>Pembayaran simpanan pokok (Rp {fmt(SIMPANAN_POKOK)})</div>
+            {OPSI_ANGSURAN.map((o, i) => (
+              <label key={i} style={{ ...S.card, display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 0, border: regData.angsuran === i ? "2px solid #2563EB" : "1px solid #E8E4DC" }}>
+                <input type="radio" name="angsuran" checked={regData.angsuran === i} onChange={() => setRegData({...regData, angsuran: i})} />
+                <div><div style={{ fontSize: 14, fontWeight: 500 }}>{o.label}</div><div style={{ fontSize: 12, color: "#64748B" }}>Rp {fmt(o.perBulan)}{o.kali > 1 ? ` × ${o.kali} bulan` : ""}</div></div>
+              </label>
+            ))}
+            {regError && <p style={{ color: "#DC2626", fontSize: 12, margin: 0 }}>{regError}</p>}
+            {regSuccess && <div style={{ background: "#DCFCE7", color: "#166534", padding: 12, borderRadius: 8, fontSize: 13 }}>{regSuccess}</div>}
+            <button style={S.btn()} onClick={handleRegister}>Daftar</button>
+            <button style={{ ...S.btn("transparent"), color: "#2563EB", border: "1.5px solid #2563EB" }} onClick={() => { setShowRegister(false); setRegSuccess(""); setRegError(""); }}>Kembali ke login</button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={{ ...S.app, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#2563EB", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, margin: "0 auto 16px" }}>K</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#2563EB" }}>KKBKM</div>
-          <div style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>Koperasi Konsumen</div>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <img src="/Logo_Koperasi.png" alt="BAZARA" style={{ width: 200, marginBottom: 8 }} />
         </div>
         <div style={{ width: "100%", maxWidth: 320 }}>
-          <input style={{ ...S.input, marginBottom: 10 }} placeholder="Nomor anggota (KKBKM-001)" value={loginId} onChange={e => setLoginId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
-          <input style={{ ...S.input, marginBottom: 6 }} type="password" placeholder="Password" value={loginPw} onChange={e => setLoginPw(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
-          {loginError && <p style={{ color: "#DC2626", fontSize: 12, margin: "4px 0 8px" }}>{loginError}</p>}
-          <p style={{ fontSize: 11, color: "#94A3B8", margin: "4px 0 14px" }}>Admin: ADMIN / admin123</p>
-          <button style={S.btn()} onClick={handleLogin}>Masuk</button>
+          <input style={{ ...S.input, marginBottom: 10 }} placeholder="Nomor anggota / ID" value={loginId} onChange={e => setLoginId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+          <input style={{ ...S.input, marginBottom: 8 }} type="password" placeholder="Password" value={loginPw} onChange={e => setLoginPw(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} />
+          {loginError && <p style={{ color: "#DC2626", fontSize: 12, margin: "0 0 8px" }}>{loginError}</p>}
+          <button style={{ ...S.btn(), marginBottom: 10 }} onClick={handleLogin}>Masuk</button>
+          <button style={{ ...S.btn("transparent"), color: "#2563EB", border: "1.5px solid #2563EB" }} onClick={() => setShowRegister(true)}>Daftar jadi anggota</button>
         </div>
       </div>
     );
@@ -305,7 +340,7 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
     const totalWajib = wajib.length * SIMPANAN_WAJIB;
     return (
       <div style={S.app}>
-        <div style={S.header}><div><div style={S.headerTitle}>Hai, {me?.nama?.split(" ")[0]}</div><div style={S.headerSub}>{user.id}</div></div><button onClick={() => setUser(null)} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Keluar</button></div>
+        <div style={S.header}><div><div style={S.headerTitle}>Hai, {me?.nama?.split(" ")[0]}</div><div style={S.headerSub}>{user.id}</div></div><button onClick={handleLogout} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Keluar</button></div>
         <div style={S.content}>
           <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
             <div style={S.statCard}><div style={{ fontSize: 11, color: "#64748B" }}>Simpanan pokok</div><div style={{ fontSize: 18, fontWeight: 600, color: pokok?.lunas ? "#16A34A" : "#DC2626", marginTop: 2 }}>{pokok?.lunas ? "Lunas" : "Belum"}</div><div style={{ fontSize: 11, color: "#94A3B8" }}>Rp {fmt(SIMPANAN_POKOK)}</div></div>
@@ -349,10 +384,10 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
   return (
     <div style={S.app}>
       <div style={S.header}>
-        <div><div style={S.headerTitle}>KKBKM</div><div style={S.headerSub}>Koperasi Konsumen</div></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><img src="/Logo_Koperasi.png" alt="BAZARA" style={{ height: 32 }} /><div><div style={S.headerTitle}>BAZARA</div></div></div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {stats.lowStock.length > 0 && tab !== "kasir" && <span style={{ background: "#FEF3C7", color: "#92400E", fontSize: 10, padding: "3px 8px", borderRadius: 10, fontWeight: 600 }}>⚠ {stats.lowStock.length} stok rendah</span>}
-          <button onClick={() => setUser(null)} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Keluar</button>
+          <button onClick={handleLogout} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Keluar</button>
         </div>
       </div>
 
@@ -503,8 +538,13 @@ const save = useCallback((m, sp, sw, br, tr, ak) => {
 
       {/* BOTTOM NAV */}
       <div style={S.bottomNav}>
-        {[{ key: "anggota", icon: "👥", label: "Anggota" }, { key: "simpanan", icon: "💰", label: "Simpanan" }, { key: "kasir", icon: "🛒", label: "Kasir" }, { key: "laporan", icon: "📊", label: "Laporan" }].map(n => (
-          <button key={n.key} style={S.navItem(tab === n.key)} onClick={() => { setTab(n.key); setSearch(""); setSearchBarang(""); }}>
+        {[
+          ...(isAdmin ? [{ key: "anggota", icon: "👥", label: "Anggota" }] : []),
+          ...(isAdmin ? [{ key: "simpanan", icon: "💰", label: "Simpanan" }] : []),
+          ...(isAdmin || isPengelola ? [{ key: "kasir", icon: "🛒", label: "Kasir" }] : []),
+          ...(isAdmin ? [{ key: "laporan", icon: "📊", label: "Laporan" }] : []),
+        ].map(n => (
+          <button key={n.key} style={{ ...S.navItem(tab === n.key), flex: 1 }} onClick={() => { setTab(n.key); setSearch(""); setSearchBarang(""); }}>
             <span style={{ fontSize: 20 }}>{n.icon}</span>{n.label}
             {n.key === "kasir" && cart.length > 0 && <span style={{ background: "#DC2626", color: "white", fontSize: 9, padding: "1px 5px", borderRadius: 8, marginTop: -2 }}>{cartCount}</span>}
           </button>
