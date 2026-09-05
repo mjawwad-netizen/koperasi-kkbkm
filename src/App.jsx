@@ -14,7 +14,7 @@ const OPSI_ANGSURAN = [
   { label: "Angsur 4x", kali: 4, perBulan: SIMPANAN_POKOK / 4 },
 ];
 
-const adminUser = { id: "ADMIN", nama: "Administrator", role: "admin", pin: "admin123" };
+const adminUser = { id: "ADMIN", nama: "Administrator", role: "admin", pin: "426580" };
 const fmt = (n) => new Intl.NumberFormat("id-ID").format(n);
 const tglNow = () => new Date().toISOString().split("T")[0];
 const waktuNow = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
