@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { API_URL, SIMPANAN_POKOK, SIMPANAN_WAJIB, BULAN, TAHUN_AKTIF, STOK_WARNING, POIN_PER_RP, OPSI_ANGSURAN, adminUser, tglNow, waktuNow } from "../config";
+import { API_URL, SIMPANAN_POKOK, SIMPANAN_WAJIB, BULAN, TAHUN_AKTIF, STOK_WARNING, POIN_PER_RP, OPSI_ANGSURAN, adminUser, tglNow, waktuNow, normalizeHP } from "../config";
 
 const STORAGE_KEY = "koperasi-data-v5";
 const Ctx = createContext();
@@ -41,7 +41,7 @@ export function DataProvider({ children }) {
         const json = await res.json();
         if (json.ok && json.data) {
           const d = json.data;
-          const nm = (d.members || []).map(m => ({ ...m, pin: pinStr(m.pin), hp: String(m.hp || "") }));
+          const nm = (d.members || []).map(m => ({ ...m, pin: pinStr(m.pin), hp: normalizeHP(m.hp) }));
           if (nm.length || !loadedMembers.length) { setMembers(nm); loadedMembers = nm; }
           if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
           if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
@@ -82,10 +82,11 @@ export function DataProvider({ children }) {
   const login = useCallback((id, pin) => {
     const iid = String(id).trim().toUpperCase();
     const ipin = String(pin).trim();
+    const inputHp = normalizeHP(id);
     if (iid === "ADMIN" && ipin === pinStr(adminUser.pin)) { setUser(adminUser); localStorage.setItem("koperasi-user", JSON.stringify(adminUser)); return { ok: true }; }
-    const m = members.find(x => (String(x.id).toUpperCase() === iid || String(x.hp).trim() === String(id).trim()) && pinStr(x.pin) === ipin);
+    const m = members.find(x => (String(x.id).toUpperCase() === iid || normalizeHP(x.hp) === inputHp) && pinStr(x.pin) === ipin);
     if (m) { if (m.status === "non-aktif") return { ok: false, error: "Akun tidak aktif" }; setUser(m); localStorage.setItem("koperasi-user", JSON.stringify(m)); return { ok: true }; }
-    const found = members.find(x => String(x.id).toUpperCase() === iid || String(x.hp).trim() === String(id).trim());
+    const found = members.find(x => String(x.id).toUpperCase() === iid || normalizeHP(x.hp) === inputHp);
     if (found) return { ok: false, error: "PIN salah" };
     return { ok: false, error: "No. HP/ID tidak terdaftar" };
   }, [members]);
@@ -109,9 +110,10 @@ export function DataProvider({ children }) {
     if (!regData.hp.trim()) return { ok: false, error: "No. HP wajib diisi" };
     if (!regData.pin || regData.pin.length < 4) return { ok: false, error: "PIN minimal 4 digit" };
     if (regData.pin !== regData.pinConfirm) return { ok: false, error: "PIN tidak cocok" };
-    if (members.find(m => String(m.hp).trim() === String(regData.hp).trim())) return { ok: false, error: "No. HP sudah terdaftar" };
+    const hpNorm = normalizeHP(regData.hp);
+    if (members.find(m => normalizeHP(m.hp) === hpNorm)) return { ok: false, error: "No. HP sudah terdaftar" };
     const id = nextId();
-    const newM = { id, nama: regData.nama, alamat: regData.alamat, hp: String(regData.hp).trim(), pin: String(regData.pin).trim(), tglMasuk: tglNow(), status: "aktif", role: "anggota", poin: 0 };
+    const newM = { id, nama: regData.nama, alamat: regData.alamat, hp: hpNorm, pin: String(regData.pin).trim(), tglMasuk: tglNow(), status: "aktif", role: "anggota", poin: 0 };
     const um = [...members, newM];
     const opsi = OPSI_ANGSURAN[regData.angsuran];
     const up = { ...simpananPokok, [id]: { lunas: false, tgl: null, skemaAngsur: opsi.kali, terbayar: 0 } };
