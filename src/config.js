@@ -1,4 +1,4 @@
-export const API_URL = "https://script.google.com/macros/s/AKfycbzfPOY00dvqUkcG-5ef9eYWGbUT9LivtCp3nmTwdVVypMsAQxsWuUvTjv6J5jsVkDYF/exec";
+export const API_URL = "PASTE_URL_APPS_SCRIPT_ANDA_DISINI";
 export const SIMPANAN_POKOK = 1000000;
 export const SIMPANAN_WAJIB = 10000;
 export const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agt","Sep","Okt","Nov","Des"];
@@ -16,6 +16,12 @@ export const adminUser = { id: "ADMIN", nama: "Administrator", role: "admin", pi
 export const fmt = (n) => new Intl.NumberFormat("id-ID").format(n);
 export const tglNow = () => new Date().toISOString().split("T")[0];
 export const waktuNow = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+export const normalizeHP = (hp) => {
+  let s = String(hp || "").trim();
+  if (s && !s.startsWith("0")) s = "0" + s;
+  return s;
+};
 
 export function compressImage(file, maxW = 400, quality = 0.4) {
   return new Promise((resolve) => {
