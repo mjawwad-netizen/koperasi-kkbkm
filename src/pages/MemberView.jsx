@@ -146,7 +146,7 @@ function BayarModal({ userId, onClose, addPembayaran }) {
         <div style={{ fontSize: 22, fontWeight: 700, color: "#16A34A", marginTop: 4 }}>Rp {fmt(jumlahBayar)}</div>
       </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Upload bukti transfer</div>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ fontSize: 13 }} />
+      <input type="file" accept="image/*" onChange={handleFoto} style={{ fontSize: 13 }} />
       {uploading && <p style={{ fontSize: 12, color: "#64748B" }}>Mengompresi...</p>}
       {buktiImg && <img src={buktiImg} alt="Bukti" style={{ width: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 8, border: "1px solid #E8E4DC" }} />}
       <input style={S.input} placeholder="No. referensi (opsional)" value={buktiText} onChange={e => setBuktiText(e.target.value)} />
