@@ -229,10 +229,12 @@ export default function Kasir() {
 
     {/* MODALS */}
     {showBarangForm && (() => {
-      const F = () => {
-        const [f, setF] = useState({ kode: generateKode("Sembako"), nama: "", kategori: "Sembako", hargaBeli: "", hargaJual: "", stok: "" });
+        const F = () => {
+        const [f, setF] = useState({ kode: generateKode("Sembako"), nama: "", kategori: "Sembako", hargaBeli: "", hargaJual: "", stok: "", foto: "" });
         const [err, setErr] = useState("");
+        const [uploading, setUploading] = useState(false);
         const handleKat = (kat) => setF({ ...f, kategori: kat, kode: generateKode(kat) });
+        const handleFoto = async (e) => { const file = e.target.files?.[0]; if (!file) return; setUploading(true); const { compressImage } = await import("../config"); setF({ ...f, foto: await compressImage(file, 300, 0.5) }); setUploading(false); };
         return (<div style={S.modal} onClick={() => setShowBarangForm(false)}><div style={S.modalContent} onClick={e => e.stopPropagation()}>
           <div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Tambah barang</span><button onClick={() => setShowBarangForm(false)} style={S.closeBtn}>✕</button></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -244,14 +246,38 @@ export default function Kasir() {
               <input style={S.input} placeholder="Harga jual" type="number" value={f.hargaJual} onChange={e => setF({ ...f, hargaJual: e.target.value })} />
             </div>
             <input style={S.input} placeholder="Stok awal" type="number" value={f.stok} onChange={e => setF({ ...f, stok: e.target.value })} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Foto produk</div>
+            <input type="file" accept="image/*" capture="environment" onChange={handleFoto} style={{ fontSize: 13 }} />
+            {uploading && <p style={{ fontSize: 12, color: "#64748B" }}>Mengompresi...</p>}
+            {f.foto && <img src={f.foto} alt="Preview" style={{ width: "100%", maxHeight: 150, objectFit: "contain", borderRadius: 8, border: "1px solid #E8E4DC" }} />}
             {err && <p style={{ color: "#DC2626", fontSize: 12, margin: 0 }}>{err}</p>}
             <button style={S.btn()} onClick={() => { if (!f.nama.trim()) { setErr("Nama wajib"); return; } if (!f.hargaJual) { setErr("Harga jual wajib"); return; } addBarang({ ...f, hargaBeli: parseInt(f.hargaBeli) || 0, hargaJual: parseInt(f.hargaJual) || 0, stok: parseInt(f.stok) || 0 }); setShowBarangForm(false); }}>Simpan</button>
           </div>
         </div></div>);
       }; return <F />;
-    })()}
 
-    {editB && (() => { const F = () => { const [f, setF] = useState(editB); return (<div style={S.modal} onClick={() => setEditB(null)}><div style={S.modalContent} onClick={e => e.stopPropagation()}><div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Edit barang</span><button onClick={() => setEditB(null)} style={S.closeBtn}>✕</button></div><div style={{ display: "flex", flexDirection: "column", gap: 10 }}><div style={{ ...S.input, background: "#F1F5F9", color: "#64748B" }}>Kode: <strong>{f.kode}</strong></div><input style={S.input} placeholder="Nama" value={f.nama} onChange={e => setF({...f, nama: e.target.value})} /><select style={S.input} value={f.kategori} onChange={e => setF({...f, kategori: e.target.value})}>{["Sembako","Bumbu","Makanan","Minuman","Kebersihan","Lainnya"].map(k => <option key={k}>{k}</option>)}</select><div style={{ display: "flex", gap: 8 }}><input style={S.input} placeholder="H. beli" type="number" value={f.hargaBeli} onChange={e => setF({...f, hargaBeli: e.target.value})} /><input style={S.input} placeholder="H. jual" type="number" value={f.hargaJual} onChange={e => setF({...f, hargaJual: e.target.value})} /></div><button style={S.btn()} onClick={() => { updateBarang({ ...f, hargaBeli: parseInt(f.hargaBeli)||0, hargaJual: parseInt(f.hargaJual)||0 }); setEditB(null); }}>Simpan</button></div></div></div>); }; return <F />; })()}
+        {editB && (() => { const F = () => {
+      const [f, setF] = useState(editB);
+      const [uploading, setUploading] = useState(false);
+      const handleFoto = async (e) => { const file = e.target.files?.[0]; if (!file) return; setUploading(true); const { compressImage } = await import("../config"); setF({ ...f, foto: await compressImage(file, 300, 0.5) }); setUploading(false); };
+      return (<div style={S.modal} onClick={() => setEditB(null)}><div style={S.modalContent} onClick={e => e.stopPropagation()}>
+        <div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Edit barang</span><button onClick={() => setEditB(null)} style={S.closeBtn}>✕</button></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ ...S.input, background: "#F1F5F9", color: "#64748B" }}>Kode: <strong>{f.kode}</strong></div>
+          <input style={S.input} placeholder="Nama" value={f.nama} onChange={e => setF({...f, nama: e.target.value})} />
+          <select style={S.input} value={f.kategori} onChange={e => setF({...f, kategori: e.target.value})}>{["Sembako","Bumbu","Makanan","Minuman","Kebersihan","Lainnya"].map(k => <option key={k}>{k}</option>)}</select>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input style={S.input} placeholder="H. beli" type="number" value={f.hargaBeli} onChange={e => setF({...f, hargaBeli: e.target.value})} />
+            <input style={S.input} placeholder="H. jual" type="number" value={f.hargaJual} onChange={e => setF({...f, hargaJual: e.target.value})} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Foto produk</div>
+          {f.foto && <img src={f.foto} alt="Preview" style={{ width: "100%", maxHeight: 150, objectFit: "contain", borderRadius: 8, border: "1px solid #E8E4DC" }} />}
+          <input type="file" accept="image/*" capture="environment" onChange={handleFoto} style={{ fontSize: 13 }} />
+          {uploading && <p style={{ fontSize: 12, color: "#64748B" }}>Mengompresi...</p>}
+          <button style={S.btn()} onClick={() => { updateBarang({ ...f, hargaBeli: parseInt(f.hargaBeli)||0, hargaJual: parseInt(f.hargaJual)||0 }); setEditB(null); }}>Simpan</button>
+        </div>
+      </div></div>);
+    }; return <F />; })()}
 
     {showRestok && (() => { const F = () => { const [qty, setQty] = useState(""); const [biaya, setBiaya] = useState(""); return (<div style={S.modal} onClick={() => setShowRestok(null)}><div style={{ ...S.modalContent, paddingBottom: 24 }} onClick={e => e.stopPropagation()}><div style={S.modalHeader}><span style={{ fontSize: 16, fontWeight: 600 }}>Restok: {showRestok.nama}</span><button onClick={() => setShowRestok(null)} style={S.closeBtn}>✕</button></div><div style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>Stok: <strong>{showRestok.stok}</strong></div><input style={{ ...S.input, marginBottom: 8 }} placeholder="Jumlah" type="number" value={qty} onChange={e => setQty(e.target.value)} /><input style={{ ...S.input, marginBottom: 10 }} placeholder="Total biaya (Rp)" type="number" value={biaya} onChange={e => setBiaya(e.target.value)} /><button style={S.btn()} onClick={() => { if (parseInt(qty) > 0) { restokBarang(showRestok.id, parseInt(qty), parseInt(biaya) || 0); setShowRestok(null); } }}>Tambah</button></div></div>); }; return <F />; })()}
 
