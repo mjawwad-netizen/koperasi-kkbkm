@@ -206,7 +206,7 @@ export default function Kasir() {
             </div>
             <input style={S.input} placeholder="Stok awal" type="number" value={f.stok} onChange={e => setF({ ...f, stok: e.target.value })} />
             <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Foto produk</div>
-            <input type="file" accept="image/*" capture="environment" onChange={handleFoto} style={{ fontSize: 13 }} />
+            <input type="file" accept="image/*" onChange={handleFoto} style={{ fontSize: 13 }} />
             {uploading && <p style={{ fontSize: 12, color: "#64748B" }}>Mengompresi...</p>}
             {f.foto && <img src={f.foto} alt="Preview" style={{ width: "100%", maxHeight: 150, objectFit: "contain", borderRadius: 8, border: "1px solid #E8E4DC" }} />}
             {err && <p style={{ color: "#DC2626", fontSize: 12, margin: 0 }}>{err}</p>}
@@ -234,7 +234,7 @@ export default function Kasir() {
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Foto produk</div>
             {f.foto && <img src={f.foto} alt="Preview" style={{ width: "100%", maxHeight: 150, objectFit: "contain", borderRadius: 8, border: "1px solid #E8E4DC" }} />}
-            <input type="file" accept="image/*" capture="environment" onChange={handleFoto} style={{ fontSize: 13 }} />
+            <input type="file" accept="image/*" onChange={handleFoto} style={{ fontSize: 13 }} />
             {uploading && <p style={{ fontSize: 12, color: "#64748B" }}>Mengompresi...</p>}
             {f.foto && <button style={{ ...S.btnSm("#DC2626"), alignSelf: "flex-start" }} onClick={() => setF({...f, foto: ""})}>Hapus foto</button>}
             <button style={S.btn()} onClick={() => { updateBarang({ ...f, hargaBeli: parseInt(f.hargaBeli)||0, hargaJual: parseInt(f.hargaJual)||0 }); setEditB(null); }}>Simpan</button>
