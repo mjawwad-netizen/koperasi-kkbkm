@@ -1,10 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { API_URL, SIMPANAN_POKOK, SIMPANAN_WAJIB, BULAN, TAHUN_AKTIF, STOK_WARNING, POIN_PER_RP, OPSI_ANGSURAN, adminUser, tglNow, waktuNow, normalizeHP } from "../config";
 
-const STORAGE_KEY = "koperasi-data-v5";
+const STORAGE_KEY = "koperasi-data-v6";
 const Ctx = createContext();
 export const useData = () => useContext(Ctx);
-
 const pinStr = (v) => v === null || v === undefined ? "" : String(v).trim();
 
 export function DataProvider({ children }) {
@@ -17,6 +16,7 @@ export function DataProvider({ children }) {
   const [arusKas, setArusKas] = useState([]);
   const [pembayaran, setPembayaran] = useState([]);
   const [shuConfig, setShuConfig] = useState({ pctTransaksi: 40, pctSimpanan: 20, pctCadangan: 40 });
+  const [notifikasi, setNotifikasi] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -34,6 +34,7 @@ export function DataProvider({ children }) {
           if (d.arusKas?.length) setArusKas(d.arusKas);
           if (d.pembayaran?.length) setPembayaran(d.pembayaran);
           if (d.shuConfig) setShuConfig(d.shuConfig);
+          if (d.notifikasi?.length) setNotifikasi(d.notifikasi);
         }
       } catch (e) {}
       try {
@@ -50,30 +51,27 @@ export function DataProvider({ children }) {
           if (d.arusKas?.length) setArusKas(d.arusKas);
           if (d.pembayaran?.length) setPembayaran(d.pembayaran);
           if (d.shuConfig) setShuConfig(d.shuConfig);
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: nm, simpananPokok: d.simpananPokok, simpananWajib: d.simpananWajib, barang: d.barang, transaksi: d.transaksi, arusKas: d.arusKas, pembayaran: d.pembayaran, shuConfig: d.shuConfig })); } catch (e) {}
+          if (d.notifikasi?.length) setNotifikasi(d.notifikasi);
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: nm, simpananPokok: d.simpananPokok, simpananWajib: d.simpananWajib, barang: d.barang, transaksi: d.transaksi, arusKas: d.arusKas, pembayaran: d.pembayaran, shuConfig: d.shuConfig, notifikasi: d.notifikasi })); } catch (e) {}
         }
-      } catch (e) { console.log("Sheets offline, pakai data lokal"); }
+      } catch (e) {}
       try {
         const su = localStorage.getItem("koperasi-user");
-        if (su) {
-          const p = JSON.parse(su);
-          if (p.id === "ADMIN") { setUser(adminUser); }
-          else { const fresh = loadedMembers.find(m => m.id === p.id); if (fresh && fresh.status === "aktif") setUser(fresh); else localStorage.removeItem("koperasi-user"); }
-        }
+        if (su) { const p = JSON.parse(su); if (p.id === "ADMIN") setUser(adminUser); else { const fresh = loadedMembers.find(m => m.id === p.id); if (fresh && fresh.status === "aktif") setUser(fresh); else localStorage.removeItem("koperasi-user"); } }
       } catch (e) {}
       setLoaded(true);
     })();
   }, []);
 
-  const save = useCallback((m, sp, sw, br, tr, ak, pb, sc) => {
-    const data = { members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak, pembayaran: pb, shuConfig: sc };
+  const save = useCallback((m, sp, sw, br, tr, ak, pb, sc, nf) => {
+    const data = { members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak, pembayaran: pb, shuConfig: sc, notifikasi: nf };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
     fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "saveAll", data }) }).catch(() => {});
   }, []);
 
-  const sv = useCallback((m, sp, sw, br, tr, ak, pb, sc) => {
-    save(m || members, sp || simpananPokok, sw || simpananWajib, br || barang, tr || transaksi, ak || arusKas, pb || pembayaran, sc || shuConfig);
-  }, [save, members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig]);
+  const sv = useCallback((m, sp, sw, br, tr, ak, pb, sc, nf) => {
+    save(m || members, sp || simpananPokok, sw || simpananWajib, br || barang, tr || transaksi, ak || arusKas, pb || pembayaran, sc || shuConfig, nf || notifikasi);
+  }, [save, members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi]);
 
   const addKas = useCallback((tipe, kategori, keterangan, jumlah, curAk) => {
     return [{ id: "AK-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4), tgl: tglNow(), waktu: waktuNow(), tipe, kategori, keterangan, jumlah }, ...curAk];
@@ -118,24 +116,13 @@ export function DataProvider({ children }) {
     const opsi = OPSI_ANGSURAN[regData.angsuran];
     const up = { ...simpananPokok, [id]: { lunas: false, tgl: null, skemaAngsur: opsi.kali, terbayar: 0 } };
     setMembers(um); setSimpananPokok(up);
-    save(um, up, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig);
+    save(um, up, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi);
     return { ok: true, id };
-  }, [members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, save, nextId]);
+  }, [members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi, save, nextId]);
 
-  const addMember = useCallback((data) => {
-    const u = [...members, { ...data, id: nextId(), tglMasuk: tglNow(), status: "aktif", pin: String(data.pin || "1234"), role: "anggota", poin: 0 }];
-    setMembers(u); sv(u);
-  }, [members, nextId, sv]);
-
-  const updateMember = useCallback((data) => {
-    const u = members.map(m => m.id === data.id ? { ...m, ...data, pin: pinStr(data.pin || m.pin) } : m);
-    setMembers(u); sv(u);
-  }, [members, sv]);
-
-  const toggleStatus = useCallback((id) => {
-    const u = members.map(m => m.id === id ? { ...m, status: m.status === "aktif" ? "non-aktif" : "aktif" } : m);
-    setMembers(u); sv(u);
-  }, [members, sv]);
+  const addMember = useCallback((data) => { const u = [...members, { ...data, id: nextId(), tglMasuk: tglNow(), status: "aktif", pin: String(data.pin || "1234"), role: "anggota", poin: 0 }]; setMembers(u); sv(u); }, [members, nextId, sv]);
+  const updateMember = useCallback((data) => { const u = members.map(m => m.id === data.id ? { ...m, ...data, pin: pinStr(data.pin || m.pin) } : m); setMembers(u); sv(u); }, [members, sv]);
+  const toggleStatus = useCallback((id) => { const u = members.map(m => m.id === id ? { ...m, status: m.status === "aktif" ? "non-aktif" : "aktif" } : m); setMembers(u); sv(u); }, [members, sv]);
 
   const bayarPokok = useCallback((id) => {
     const u = { ...simpananPokok, [id]: { ...simpananPokok[id], lunas: true, tgl: tglNow() } };
@@ -145,27 +132,15 @@ export function DataProvider({ children }) {
   }, [simpananPokok, members, arusKas, addKas, sv]);
 
   const toggleWajib = useCallback((id, bulanIdx) => {
-    const cur = simpananWajib[id] || [];
-    const nama = members.find(m => m.id === id)?.nama || id;
+    const cur = simpananWajib[id] || []; const nama = members.find(m => m.id === id)?.nama || id;
     let u, ak;
-    if (cur.includes(bulanIdx)) {
-      u = { ...simpananWajib, [id]: cur.filter(b => b !== bulanIdx) };
-      ak = addKas("keluar", "Koreksi simpanan wajib", "Batal: " + nama + " - " + BULAN[bulanIdx], SIMPANAN_WAJIB, arusKas);
-    } else {
-      u = { ...simpananWajib, [id]: [...cur, bulanIdx].sort((a, b) => a - b) };
-      ak = addKas("masuk", "Simpanan wajib", nama + " - " + BULAN[bulanIdx], SIMPANAN_WAJIB, arusKas);
-    }
+    if (cur.includes(bulanIdx)) { u = { ...simpananWajib, [id]: cur.filter(b => b !== bulanIdx) }; ak = addKas("keluar", "Koreksi simpanan wajib", "Batal: " + nama + " - " + BULAN[bulanIdx], SIMPANAN_WAJIB, arusKas); }
+    else { u = { ...simpananWajib, [id]: [...cur, bulanIdx].sort((a, b) => a - b) }; ak = addKas("masuk", "Simpanan wajib", nama + " - " + BULAN[bulanIdx], SIMPANAN_WAJIB, arusKas); }
     setSimpananWajib(u); setArusKas(ak); sv(null, null, u, null, null, ak);
   }, [simpananWajib, members, arusKas, addKas, sv]);
 
-  const addBarang = useCallback((data) => {
-    const u = [...barang, { ...data, id: nextBarangId() }]; setBarang(u); sv(null, null, null, u);
-  }, [barang, nextBarangId, sv]);
-
-  const updateBarang = useCallback((data) => {
-    const u = barang.map(b => b.id === data.id ? { ...b, ...data } : b); setBarang(u); sv(null, null, null, u);
-  }, [barang, sv]);
-
+  const addBarang = useCallback((data) => { const u = [...barang, { ...data, id: nextBarangId() }]; setBarang(u); sv(null, null, null, u); }, [barang, nextBarangId, sv]);
+  const updateBarang = useCallback((data) => { const u = barang.map(b => b.id === data.id ? { ...b, ...data } : b); setBarang(u); sv(null, null, null, u); }, [barang, sv]);
   const restokBarang = useCallback((id, qty, totalBiaya) => {
     const u = barang.map(b => b.id === id ? { ...b, stok: b.stok + qty } : b);
     const item = barang.find(b => b.id === id);
@@ -180,67 +155,59 @@ export function DataProvider({ children }) {
     const ut = [trx, ...transaksi];
     const ak = addKas("masuk", "Penjualan", pembeli.nama + " - " + cart.length + " jenis", cartTotal, arusKas);
     let um = members;
-    if (pembeli.type === "anggota" && pembeli.id) {
-      const poinBaru = Math.floor(cartTotal / POIN_PER_RP);
-      um = members.map(m => m.id === pembeli.id ? { ...m, poin: (m.poin || 0) + poinBaru } : m);
-      setMembers(um);
-    }
+    if (pembeli.type === "anggota" && pembeli.id) { const poinBaru = Math.floor(cartTotal / POIN_PER_RP); um = members.map(m => m.id === pembeli.id ? { ...m, poin: (m.poin || 0) + poinBaru } : m); setMembers(um); }
     setBarang(ub); setTransaksi(ut); setArusKas(ak);
-    save(um, simpananPokok, simpananWajib, ub, ut, ak, pembayaran, shuConfig);
+    save(um, simpananPokok, simpananWajib, ub, ut, ak, pembayaran, shuConfig, notifikasi);
     return trx;
-  }, [members, barang, transaksi, arusKas, simpananPokok, simpananWajib, pembayaran, shuConfig, addKas, save]);
+  }, [members, barang, transaksi, arusKas, simpananPokok, simpananWajib, pembayaran, shuConfig, notifikasi, addKas, save]);
 
-  const addPengeluaran = useCallback((data) => {
-    const ak = addKas("keluar", data.kategori, data.keterangan, parseInt(data.jumlah), arusKas);
-    setArusKas(ak); sv(null, null, null, null, null, ak);
-  }, [arusKas, addKas, sv]);
+  const addPengeluaran = useCallback((data) => { const ak = addKas("keluar", data.kategori, data.keterangan, parseInt(data.jumlah), arusKas); setArusKas(ak); sv(null, null, null, null, null, ak); }, [arusKas, addKas, sv]);
+  const addPembayaran = useCallback((data) => { const u = [data, ...pembayaran]; setPembayaran(u); sv(null, null, null, null, null, null, u); }, [pembayaran, sv]);
+  const updatePembayaranStatus = useCallback((id, status) => { const u = pembayaran.map(x => x.id === id ? { ...x, status: status } : x); setPembayaran(u); sv(null, null, null, null, null, null, u); }, [pembayaran, sv]);
+  const updateShuConfig = useCallback((cfg) => { setShuConfig(cfg); save(members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, cfg, notifikasi); }, [members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, notifikasi, save]);
 
-  const addPembayaran = useCallback((data) => {
-    const u = [data, ...pembayaran]; setPembayaran(u); sv(null, null, null, null, null, null, u);
-  }, [pembayaran, sv]);
+  // NOTIFIKASI
+  const addNotifikasi = useCallback((data) => {
+    const n = { id: "NF-" + Date.now(), tgl: tglNow(), waktu: waktuNow(), ...data, dibaca: {} };
+    const u = [n, ...notifikasi];
+    setNotifikasi(u); sv(null, null, null, null, null, null, null, null, u);
+    return n;
+  }, [notifikasi, sv]);
 
-  const updatePembayaranStatus = useCallback((id, status) => {
-    const u = pembayaran.map(x => x.id === id ? { ...x, status: status } : x); setPembayaran(u); sv(null, null, null, null, null, null, u);
-  }, [pembayaran, sv]);
+  const tandaiBaca = useCallback((notifId, userId) => {
+    const u = notifikasi.map(n => n.id === notifId ? { ...n, dibaca: { ...n.dibaca, [userId]: true } } : n);
+    setNotifikasi(u); sv(null, null, null, null, null, null, null, null, u);
+  }, [notifikasi, sv]);
 
-  const updateShuConfig = useCallback((cfg) => {
-    setShuConfig(cfg); save(members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, cfg);
-  }, [members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, save]);
+  const hapusNotifikasi = useCallback((notifId) => {
+    const u = notifikasi.filter(n => n.id !== notifId);
+    setNotifikasi(u); sv(null, null, null, null, null, null, null, null, u);
+  }, [notifikasi, sv]);
 
   const currentMonth = new Date().getMonth();
   const activeMembers = useMemo(() => members.filter(m => m.status === "aktif"), [members]);
   const lowStock = useMemo(() => barang.filter(b => b.stok <= STOK_WARNING), [barang]);
 
   const hitungSHU = useCallback((memberId) => {
-    const m = members.find(x => x.id === memberId);
-    if (!m) return 0;
+    const m = members.find(x => x.id === memberId); if (!m) return 0;
     const labaK = transaksi.reduce((s, t) => s + t.items.reduce((si, it) => si + (it.harga - (it.hargaBeli || 0)) * it.qty, 0), 0);
     const totalPoin = members.reduce((s, x) => s + (x.poin || 0), 0);
-    const totalSimp = members.reduce((s, x) => {
-      const w = simpananWajib[x.id] || [];
-      const p = simpananPokok[x.id];
-      return s + w.length * SIMPANAN_WAJIB + (p && p.lunas ? SIMPANAN_POKOK : 0);
-    }, 0);
-    const shuT = labaK * (shuConfig.pctTransaksi / 100);
-    const shuS = labaK * (shuConfig.pctSimpanan / 100);
-    const poinM = m.poin || 0;
-    const simpM = ((simpananWajib[m.id] || []).length * SIMPANAN_WAJIB) + (simpananPokok[m.id] && simpananPokok[m.id].lunas ? SIMPANAN_POKOK : 0);
+    const totalSimp = members.reduce((s, x) => { const w = simpananWajib[x.id] || []; const p = simpananPokok[x.id]; return s + w.length * SIMPANAN_WAJIB + (p && p.lunas ? SIMPANAN_POKOK : 0); }, 0);
+    const shuT = labaK * (shuConfig.pctTransaksi / 100); const shuS = labaK * (shuConfig.pctSimpanan / 100);
+    const poinM = m.poin || 0; const simpM = ((simpananWajib[m.id] || []).length * SIMPANAN_WAJIB) + (simpananPokok[m.id] && simpananPokok[m.id].lunas ? SIMPANAN_POKOK : 0);
     return Math.round((totalPoin > 0 ? (poinM / totalPoin) * shuT : 0) + (totalSimp > 0 ? (simpM / totalSimp) * shuS : 0));
   }, [members, simpananPokok, simpananWajib, transaksi, shuConfig]);
 
   const labaKotor = useMemo(() => transaksi.reduce((s, t) => s + t.items.reduce((si, it) => si + (it.harga - (it.hargaBeli || 0)) * it.qty, 0), 0), [transaksi]);
 
   const value = {
-    user, loaded, members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig,
+    user, loaded, members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi,
     activeMembers, lowStock, currentMonth, labaKotor,
-    login, logout, register,
-    addMember, updateMember, toggleStatus,
-    bayarPokok, toggleWajib,
-    addBarang, updateBarang, restokBarang,
-    prosesTransaksi, addPengeluaran,
-    addPembayaran, updatePembayaranStatus,
-    updateShuConfig, hitungSHU, sv
+    login, logout, register, addMember, updateMember, toggleStatus,
+    bayarPokok, toggleWajib, addBarang, updateBarang, restokBarang,
+    prosesTransaksi, addPengeluaran, addPembayaran, updatePembayaranStatus,
+    updateShuConfig, hitungSHU, sv,
+    addNotifikasi, tandaiBaca, hapusNotifikasi,
   };
-
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
