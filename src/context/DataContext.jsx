@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { API_URL, SIMPANAN_POKOK, SIMPANAN_WAJIB, BULAN, TAHUN_AKTIF, STOK_WARNING, POIN_PER_RP, OPSI_ANGSURAN, adminUser, tglNow, waktuNow, normalizeHP } from "../config";
 
 const STORAGE_KEY = "koperasi-data-v6";
+const OLD_KEYS = ["koperasi-data-v5", "koperasi-data-v4", "koperasi-data-v3"];
 const Ctx = createContext();
 export const useData = () => useContext(Ctx);
 const pinStr = (v) => v === null || v === undefined ? "" : String(v).trim();
@@ -18,65 +19,142 @@ export function DataProvider({ children }) {
   const [shuConfig, setShuConfig] = useState({ pctTransaksi: 40, pctSimpanan: 20, pctCadangan: 40 });
   const [notifikasi, setNotifikasi] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const dataLoaded = useRef(false); // Mencegah save sebelum data selesai load
 
   useEffect(() => {
     (async () => {
-      let loadedMembers = [];
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const d = JSON.parse(raw);
-          if (d.members?.length) { setMembers(d.members); loadedMembers = d.members; }
-          if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
-          if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
-          if (d.barang?.length) setBarang(d.barang);
-          if (d.transaksi?.length) setTransaksi(d.transaksi);
-          if (d.arusKas?.length) setArusKas(d.arusKas);
-          if (d.pembayaran?.length) setPembayaran(d.pembayaran);
-          if (d.shuConfig) setShuConfig(d.shuConfig);
-          if (d.notifikasi?.length) setNotifikasi(d.notifikasi);
-        }
-      } catch (e) {}
+      let localData = null;
+
+      // 1. Cari data lokal (coba key baru dulu, lalu key lama)
+      for (const key of [STORAGE_KEY, ...OLD_KEYS]) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) { localData = JSON.parse(raw); break; }
+        } catch (e) {}
+      }
+
+      // 2. Terapkan data lokal sebagai baseline
+      if (localData) {
+        if (localData.members?.length) setMembers(localData.members);
+        if (localData.simpananPokok && Object.keys(localData.simpananPokok).length) setSimpananPokok(localData.simpananPokok);
+        if (localData.simpananWajib && Object.keys(localData.simpananWajib).length) setSimpananWajib(localData.simpananWajib);
+        if (localData.barang?.length) setBarang(localData.barang);
+        if (localData.transaksi?.length) setTransaksi(localData.transaksi);
+        if (localData.arusKas?.length) setArusKas(localData.arusKas);
+        if (localData.pembayaran?.length) setPembayaran(localData.pembayaran);
+        if (localData.shuConfig) setShuConfig(localData.shuConfig);
+        if (localData.notifikasi?.length) setNotifikasi(localData.notifikasi);
+      }
+
+      // 3. Coba ambil dari Sheets (hanya overwrite kalau Sheets punya data)
+      let sheetsData = null;
       try {
         const res = await fetch(API_URL);
         const json = await res.json();
-        if (json.ok && json.data) {
-          const d = json.data;
-          const nm = (d.members || []).map(m => ({ ...m, pin: pinStr(m.pin), hp: normalizeHP(m.hp) }));
-          if (nm.length || !loadedMembers.length) { setMembers(nm); loadedMembers = nm; }
-          if (d.simpananPokok) setSimpananPokok(d.simpananPokok);
-          if (d.simpananWajib) setSimpananWajib(d.simpananWajib);
-          if (d.barang?.length) setBarang(d.barang.map(b => ({ ...b, hargaBeli: Number(b.hargaBeli), hargaJual: Number(b.hargaJual), stok: Number(b.stok) })));
-          if (d.transaksi?.length) setTransaksi(d.transaksi);
-          if (d.arusKas?.length) setArusKas(d.arusKas);
-          if (d.pembayaran?.length) setPembayaran(d.pembayaran);
-          if (d.shuConfig) setShuConfig(d.shuConfig);
-          if (d.notifikasi?.length) setNotifikasi(d.notifikasi);
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: nm, simpananPokok: d.simpananPokok, simpananWajib: d.simpananWajib, barang: d.barang, transaksi: d.transaksi, arusKas: d.arusKas, pembayaran: d.pembayaran, shuConfig: d.shuConfig, notifikasi: d.notifikasi })); } catch (e) {}
-        }
-      } catch (e) {}
+        if (json.ok && json.data) sheetsData = json.data;
+      } catch (e) { console.log("Sheets offline"); }
+
+      if (sheetsData) {
+        const d = sheetsData;
+        const nm = (d.members || []).map(m => ({ ...m, pin: pinStr(m.pin), hp: normalizeHP(m.hp) }));
+        // Hanya overwrite kalau Sheets punya data LEBIH BANYAK atau lokal kosong
+        if (nm.length > 0) setMembers(nm);
+        if (d.simpananPokok && Object.keys(d.simpananPokok).length) setSimpananPokok(d.simpananPokok);
+        if (d.simpananWajib && Object.keys(d.simpananWajib).length) setSimpananWajib(d.simpananWajib);
+        if (d.barang?.length) setBarang(d.barang.map(b => ({ ...b, hargaBeli: Number(b.hargaBeli), hargaJual: Number(b.hargaJual), stok: Number(b.stok) })));
+        if (d.transaksi?.length) setTransaksi(d.transaksi);
+        if (d.arusKas?.length) setArusKas(d.arusKas);
+        if (d.pembayaran?.length) setPembayaran(d.pembayaran);
+        if (d.shuConfig) setShuConfig(d.shuConfig);
+        if (d.notifikasi?.length) setNotifikasi(d.notifikasi);
+      }
+
+      // 4. Restore session
       try {
         const su = localStorage.getItem("koperasi-user");
-        if (su) { const p = JSON.parse(su); if (p.id === "ADMIN") setUser(adminUser); else { const fresh = loadedMembers.find(m => m.id === p.id); if (fresh && fresh.status === "aktif") setUser(fresh); else localStorage.removeItem("koperasi-user"); } }
+        if (su) {
+          const p = JSON.parse(su);
+          if (p.id === "ADMIN") setUser(adminUser);
+          else {
+            // Cari dari data terbaru
+            const allMembers = sheetsData?.members?.length ? sheetsData.members : (localData?.members || []);
+            const fresh = allMembers.find(m => m.id === p.id);
+            if (fresh && fresh.status !== "non-aktif") setUser({ ...fresh, pin: pinStr(fresh.pin), hp: normalizeHP(fresh.hp) });
+            else localStorage.removeItem("koperasi-user");
+          }
+        }
       } catch (e) {}
+
+      // 5. Simpan ke key terbaru & hapus key lama
+      try {
+        const currentData = { members: sheetsData?.members?.length ? sheetsData.members.map(m => ({...m, pin: pinStr(m.pin), hp: normalizeHP(m.hp)})) : (localData?.members || []), simpananPokok: sheetsData?.simpananPokok || localData?.simpananPokok || {}, simpananWajib: sheetsData?.simpananWajib || localData?.simpananWajib || {}, barang: sheetsData?.barang || localData?.barang || [], transaksi: sheetsData?.transaksi || localData?.transaksi || [], arusKas: sheetsData?.arusKas || localData?.arusKas || [], pembayaran: sheetsData?.pembayaran || localData?.pembayaran || [], shuConfig: sheetsData?.shuConfig || localData?.shuConfig || { pctTransaksi: 40, pctSimpanan: 20, pctCadangan: 40 }, notifikasi: sheetsData?.notifikasi || localData?.notifikasi || [] };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentData));
+        OLD_KEYS.forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+
+      dataLoaded.current = true;
       setLoaded(true);
     })();
   }, []);
 
+  // Save — hanya jalan kalau data sudah loaded
   const save = useCallback((m, sp, sw, br, tr, ak, pb, sc, nf) => {
+    if (!dataLoaded.current) return; // PENTING: jangan save sebelum load selesai
     const data = { members: m, simpananPokok: sp, simpananWajib: sw, barang: br, transaksi: tr, arusKas: ak, pembayaran: pb, shuConfig: sc, notifikasi: nf };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
-    fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "saveAll", data }) }).catch(() => {});
+    // Hanya sync ke Sheets kalau ada data member (hindari overwrite dengan kosong)
+    if (m && m.length > 0) {
+      fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "saveAll", data }) }).catch(() => {});
+    }
   }, []);
 
-  const sv = useCallback((m, sp, sw, br, tr, ak, pb, sc, nf) => {
-    save(m || members, sp || simpananPokok, sw || simpananWajib, br || barang, tr || transaksi, ak || arusKas, pb || pembayaran, sc || shuConfig, nf || notifikasi);
-  }, [save, members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi]);
+  // Helper save — ambil state terkini via callback
+  const doSave = useCallback((overrides) => {
+    setMembers(curM => {
+      setSimpananPokok(curSP => {
+        setSimpananWajib(curSW => {
+          setBarang(curBR => {
+            setTransaksi(curTR => {
+              setArusKas(curAK => {
+                setPembayaran(curPB => {
+                  setShuConfig(curSC => {
+                    setNotifikasi(curNF => {
+                      save(
+                        overrides.members || curM,
+                        overrides.simpananPokok || curSP,
+                        overrides.simpananWajib || curSW,
+                        overrides.barang || curBR,
+                        overrides.transaksi || curTR,
+                        overrides.arusKas || curAK,
+                        overrides.pembayaran || curPB,
+                        overrides.shuConfig || curSC,
+                        overrides.notifikasi || curNF
+                      );
+                      return curNF;
+                    });
+                    return curSC;
+                  });
+                  return curPB;
+                });
+                return curAK;
+              });
+              return curTR;
+            });
+            return curBR;
+          });
+          return curSW;
+        });
+        return curSP;
+      });
+      return curM;
+    });
+  }, [save]);
 
   const addKas = useCallback((tipe, kategori, keterangan, jumlah, curAk) => {
     return [{ id: "AK-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4), tgl: tglNow(), waktu: waktuNow(), tipe, kategori, keterangan, jumlah }, ...curAk];
   }, []);
 
+  // AUTH
   const login = useCallback((id, pin) => {
     const iid = String(id).trim().toUpperCase();
     const ipin = String(pin).trim();
@@ -103,6 +181,7 @@ export function DataProvider({ children }) {
     return "B" + String(Math.max(...nums) + 1).padStart(3, "0");
   }, [barang]);
 
+  // REGISTER
   const register = useCallback((regData) => {
     if (!regData.nama.trim()) return { ok: false, error: "Nama wajib diisi" };
     if (!regData.hp.trim()) return { ok: false, error: "No. HP wajib diisi" };
@@ -116,38 +195,59 @@ export function DataProvider({ children }) {
     const opsi = OPSI_ANGSURAN[regData.angsuran];
     const up = { ...simpananPokok, [id]: { lunas: false, tgl: null, skemaAngsur: opsi.kali, terbayar: 0 } };
     setMembers(um); setSimpananPokok(up);
-    save(um, up, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi);
+    doSave({ members: um, simpananPokok: up });
     return { ok: true, id };
-  }, [members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, shuConfig, notifikasi, save, nextId]);
+  }, [members, simpananPokok, nextId, doSave]);
 
-  const addMember = useCallback((data) => { const u = [...members, { ...data, id: nextId(), tglMasuk: tglNow(), status: "aktif", pin: String(data.pin || "1234"), role: "anggota", poin: 0 }]; setMembers(u); sv(u); }, [members, nextId, sv]);
-  const updateMember = useCallback((data) => { const u = members.map(m => m.id === data.id ? { ...m, ...data, pin: pinStr(data.pin || m.pin) } : m); setMembers(u); sv(u); }, [members, sv]);
-  const toggleStatus = useCallback((id) => { const u = members.map(m => m.id === id ? { ...m, status: m.status === "aktif" ? "non-aktif" : "aktif" } : m); setMembers(u); sv(u); }, [members, sv]);
+  // MEMBER CRUD
+  const addMember = useCallback((data) => {
+    const u = [...members, { ...data, id: nextId(), tglMasuk: tglNow(), status: "aktif", pin: String(data.pin || "1234"), role: "anggota", poin: 0 }];
+    setMembers(u); doSave({ members: u });
+  }, [members, nextId, doSave]);
 
+  const updateMember = useCallback((data) => {
+    const u = members.map(m => m.id === data.id ? { ...m, ...data, pin: pinStr(data.pin || m.pin) } : m);
+    setMembers(u); doSave({ members: u });
+  }, [members, doSave]);
+
+  const toggleStatus = useCallback((id) => {
+    const u = members.map(m => m.id === id ? { ...m, status: m.status === "aktif" ? "non-aktif" : "aktif" } : m);
+    setMembers(u); doSave({ members: u });
+  }, [members, doSave]);
+
+  // SIMPANAN
   const bayarPokok = useCallback((id) => {
     const u = { ...simpananPokok, [id]: { ...simpananPokok[id], lunas: true, tgl: tglNow() } };
     const nama = members.find(m => m.id === id)?.nama || id;
     const ak = addKas("masuk", "Simpanan pokok", nama + " (" + id + ")", SIMPANAN_POKOK, arusKas);
-    setSimpananPokok(u); setArusKas(ak); sv(null, u, null, null, null, ak);
-  }, [simpananPokok, members, arusKas, addKas, sv]);
+    setSimpananPokok(u); setArusKas(ak); doSave({ simpananPokok: u, arusKas: ak });
+  }, [simpananPokok, members, arusKas, addKas, doSave]);
 
   const toggleWajib = useCallback((id, bulanIdx) => {
     const cur = simpananWajib[id] || []; const nama = members.find(m => m.id === id)?.nama || id;
     let u, ak;
     if (cur.includes(bulanIdx)) { u = { ...simpananWajib, [id]: cur.filter(b => b !== bulanIdx) }; ak = addKas("keluar", "Koreksi simpanan wajib", "Batal: " + nama + " - " + BULAN[bulanIdx], SIMPANAN_WAJIB, arusKas); }
     else { u = { ...simpananWajib, [id]: [...cur, bulanIdx].sort((a, b) => a - b) }; ak = addKas("masuk", "Simpanan wajib", nama + " - " + BULAN[bulanIdx], SIMPANAN_WAJIB, arusKas); }
-    setSimpananWajib(u); setArusKas(ak); sv(null, null, u, null, null, ak);
-  }, [simpananWajib, members, arusKas, addKas, sv]);
+    setSimpananWajib(u); setArusKas(ak); doSave({ simpananWajib: u, arusKas: ak });
+  }, [simpananWajib, members, arusKas, addKas, doSave]);
 
-  const addBarang = useCallback((data) => { const u = [...barang, { ...data, id: nextBarangId() }]; setBarang(u); sv(null, null, null, u); }, [barang, nextBarangId, sv]);
-  const updateBarang = useCallback((data) => { const u = barang.map(b => b.id === data.id ? { ...b, ...data } : b); setBarang(u); sv(null, null, null, u); }, [barang, sv]);
+  // BARANG
+  const addBarang = useCallback((data) => {
+    const u = [...barang, { ...data, id: nextBarangId() }]; setBarang(u); doSave({ barang: u });
+  }, [barang, nextBarangId, doSave]);
+
+  const updateBarang = useCallback((data) => {
+    const u = barang.map(b => b.id === data.id ? { ...b, ...data } : b); setBarang(u); doSave({ barang: u });
+  }, [barang, doSave]);
+
   const restokBarang = useCallback((id, qty, totalBiaya) => {
     const u = barang.map(b => b.id === id ? { ...b, stok: b.stok + qty } : b);
     const item = barang.find(b => b.id === id);
     const ak = addKas("keluar", "Pembelian stok", "Restok: " + (item?.nama || "") + " (" + qty + " pcs)", totalBiaya, arusKas);
-    setBarang(u); setArusKas(ak); sv(null, null, null, u, null, ak);
-  }, [barang, arusKas, addKas, sv]);
+    setBarang(u); setArusKas(ak); doSave({ barang: u, arusKas: ak });
+  }, [barang, arusKas, addKas, doSave]);
 
+  // TRANSAKSI
   const prosesTransaksi = useCallback((cart, nominal, pembeli) => {
     const cartTotal = cart.reduce((s, c) => s + c.hargaJual * c.qty, 0);
     const trx = { id: "TRX-" + Date.now(), tgl: tglNow(), waktu: waktuNow(), items: cart.map(c => ({ id: c.id, nama: c.nama, harga: c.hargaJual, hargaBeli: c.hargaBeli, qty: c.qty, subtotal: c.hargaJual * c.qty })), total: cartTotal, bayar: nominal, kembalian: nominal - cartTotal, pembeli: pembeli };
@@ -155,34 +255,50 @@ export function DataProvider({ children }) {
     const ut = [trx, ...transaksi];
     const ak = addKas("masuk", "Penjualan", pembeli.nama + " - " + cart.length + " jenis", cartTotal, arusKas);
     let um = members;
-    if (pembeli.type === "anggota" && pembeli.id) { const poinBaru = Math.floor(cartTotal / POIN_PER_RP); um = members.map(m => m.id === pembeli.id ? { ...m, poin: (m.poin || 0) + poinBaru } : m); setMembers(um); }
+    if (pembeli.type === "anggota" && pembeli.id) {
+      const poinBaru = Math.floor(cartTotal / POIN_PER_RP);
+      um = members.map(m => m.id === pembeli.id ? { ...m, poin: (m.poin || 0) + poinBaru } : m);
+      setMembers(um);
+    }
     setBarang(ub); setTransaksi(ut); setArusKas(ak);
-    save(um, simpananPokok, simpananWajib, ub, ut, ak, pembayaran, shuConfig, notifikasi);
+    doSave({ members: um, barang: ub, transaksi: ut, arusKas: ak });
     return trx;
-  }, [members, barang, transaksi, arusKas, simpananPokok, simpananWajib, pembayaran, shuConfig, notifikasi, addKas, save]);
+  }, [members, barang, transaksi, arusKas, addKas, doSave]);
 
-  const addPengeluaran = useCallback((data) => { const ak = addKas("keluar", data.kategori, data.keterangan, parseInt(data.jumlah), arusKas); setArusKas(ak); sv(null, null, null, null, null, ak); }, [arusKas, addKas, sv]);
-  const addPembayaran = useCallback((data) => { const u = [data, ...pembayaran]; setPembayaran(u); sv(null, null, null, null, null, null, u); }, [pembayaran, sv]);
-  const updatePembayaranStatus = useCallback((id, status) => { const u = pembayaran.map(x => x.id === id ? { ...x, status: status } : x); setPembayaran(u); sv(null, null, null, null, null, null, u); }, [pembayaran, sv]);
-  const updateShuConfig = useCallback((cfg) => { setShuConfig(cfg); save(members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, cfg, notifikasi); }, [members, simpananPokok, simpananWajib, barang, transaksi, arusKas, pembayaran, notifikasi, save]);
+  const addPengeluaran = useCallback((data) => {
+    const ak = addKas("keluar", data.kategori, data.keterangan, parseInt(data.jumlah), arusKas);
+    setArusKas(ak); doSave({ arusKas: ak });
+  }, [arusKas, addKas, doSave]);
+
+  const addPembayaran = useCallback((data) => {
+    const u = [data, ...pembayaran]; setPembayaran(u); doSave({ pembayaran: u });
+  }, [pembayaran, doSave]);
+
+  const updatePembayaranStatus = useCallback((id, status) => {
+    const u = pembayaran.map(x => x.id === id ? { ...x, status: status } : x); setPembayaran(u); doSave({ pembayaran: u });
+  }, [pembayaran, doSave]);
+
+  const updateShuConfig = useCallback((cfg) => {
+    setShuConfig(cfg); doSave({ shuConfig: cfg });
+  }, [doSave]);
 
   // NOTIFIKASI
   const addNotifikasi = useCallback((data) => {
     const n = { id: "NF-" + Date.now(), tgl: tglNow(), waktu: waktuNow(), ...data, dibaca: {} };
     const u = [n, ...notifikasi];
-    setNotifikasi(u); sv(null, null, null, null, null, null, null, null, u);
+    setNotifikasi(u); doSave({ notifikasi: u });
     return n;
-  }, [notifikasi, sv]);
+  }, [notifikasi, doSave]);
 
   const tandaiBaca = useCallback((notifId, userId) => {
     const u = notifikasi.map(n => n.id === notifId ? { ...n, dibaca: { ...n.dibaca, [userId]: true } } : n);
-    setNotifikasi(u); sv(null, null, null, null, null, null, null, null, u);
-  }, [notifikasi, sv]);
+    setNotifikasi(u); doSave({ notifikasi: u });
+  }, [notifikasi, doSave]);
 
   const hapusNotifikasi = useCallback((notifId) => {
     const u = notifikasi.filter(n => n.id !== notifId);
-    setNotifikasi(u); sv(null, null, null, null, null, null, null, null, u);
-  }, [notifikasi, sv]);
+    setNotifikasi(u); doSave({ notifikasi: u });
+  }, [notifikasi, doSave]);
 
   const currentMonth = new Date().getMonth();
   const activeMembers = useMemo(() => members.filter(m => m.status === "aktif"), [members]);
@@ -206,7 +322,7 @@ export function DataProvider({ children }) {
     login, logout, register, addMember, updateMember, toggleStatus,
     bayarPokok, toggleWajib, addBarang, updateBarang, restokBarang,
     prosesTransaksi, addPengeluaran, addPembayaran, updatePembayaranStatus,
-    updateShuConfig, hitungSHU, sv,
+    updateShuConfig, hitungSHU,
     addNotifikasi, tandaiBaca, hapusNotifikasi,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
