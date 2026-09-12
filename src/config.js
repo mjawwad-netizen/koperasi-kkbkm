@@ -1,4 +1,4 @@
-export const API_URL = "PASTE_URL_APPS_SCRIPT_ANDA_DISINI";
+export const API_URL = "https://script.google.com/macros/s/AKfycbzfPOY00dvqUkcG-5ef9eYWGbUT9LivtCp3nmTwdVVypMsAQxsWuUvTjv6J5jsVkDYF/exec";
 export const SIMPANAN_POKOK = 1000000;
 export const SIMPANAN_WAJIB = 10000;
 export const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agt","Sep","Okt","Nov","Des"];
