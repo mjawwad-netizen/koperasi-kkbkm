@@ -34,13 +34,13 @@ export default function MemberView() {
   return (
     <div style={S.app}>
       <div style={S.header}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><img src="/logo.png" alt="BAZARA" style={{ height: 28 }} /><div style={{ fontSize: 15, fontWeight: 600 }}>Hai, {me?.nama?.split(" ")[0]}</div></div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => setShowNotif(true)} style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer", position: "relative" }}>
-            🔔
-            {unreadCount > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#DC2626", color: "white", fontSize: 9, width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{unreadCount}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><img src="/logo.png" alt="BAZARA" style={{ height: 32, borderRadius: 8 }} /><div><div style={{ fontSize: 16, fontWeight: 700 }}>Hai, {me?.nama?.split(" ")[0]}</div><div style={{ fontSize: 10, opacity: 0.8 }}>{user.id}</div></div></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setShowNotif(true)} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", color: "white", borderRadius: 10, width: 36, height: 36, cursor: "pointer", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="ti ti-bell" style={{ fontSize: 18 }}></i>
+            {unreadCount > 0 && <span style={{ position: "absolute", top: -3, right: -3, background: "#EF4444", color: "white", fontSize: 8, width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{unreadCount}</span>}
           </button>
-          <button onClick={logout} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer" }}>Keluar</button>
+          <button onClick={logout} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", color: "white", borderRadius: 10, padding: "6px 14px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}><i className="ti ti-logout" style={{ marginRight: 4, fontSize: 14 }}></i>Keluar</button>
         </div>
       </div>
 
